@@ -58,3 +58,59 @@ Disclaimer
 ----------
 Apple owns all the rights on Siri. I do not give any warranties or guaranteed support for this software. Use it as it is.
  
+# SiriServer Plugin Collection
+
+## cytec:
+
+###Multi Language:
+
+[**twitterPlugin**](https://github.com/cytec/SiriServer-Plugins/tree/master/twitterPlugin):<br />
+Description: send tweets with siri and get last 5 tweets from timeline <br />
+Requires: yelp api key
+
+[**yelpSearch**](https://github.com/cytec/SiriServer-Plugins/tree/master/yelpSearch) originally by apexad:<br />
+Description: Search for Stuff near you <br />
+Requires: [yelp API Key](http://www.yelp.com/developers)
+
+[**memebase**](https://github.com/cytec/SiriServer-Plugins/tree/master/memebase)<br />
+Description: Get latest memes from Memebase.com<br />
+Requires: [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/) or <code>easy_install BeautifulSoup</code>
+
+[**sickbeardHistory**](https://github.com/cytec/SiriServer-Plugins/tree/master/SickbeardHistory) <br />
+Description: Get last 5 Downloaded Episodes from SickBeard
+
+###German:
+
+[**pantofflhelden**](https://github.com/cytec/SiriServer-Plugins/tree/master/pantofflhelden)<br />
+Description: Get latest updates from pantofflhelden.com<br />
+Requires: [feedparser](http://pypi.python.org/pypi/feedparser) or <code>easy_install feedparser</code>
+
+[**wissen**](https://github.com/cytec/SiriServer-Plugins/tree/master/Wissen)<br />
+Description: Get random german qoutes or fakts<br />
+Requires: [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/) or <code>easy_install BeautifulSoup</code>"
+
+[**ferien**](https://github.com/cytec/SiriServer-Plugins/tree/master/ferien)<br />
+Description: Ferientermine für Bundesländer <br>
+bsp: "Sommerferien in Hessen" zeigt die Sommerferien für das aktuelle Jahr im Bundesland Hessen<br />
+Requires: [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/) or <code>easy_install BeautifulSoup</code>"
+
+[**stau**](https://github.com/cytec/SiriServer-Plugins/tree/master/stau)<br />
+Description: Aktuelle Staumeldungen für Deutschland <br>
+bsp: "Stau auf der A5" zeigt die Staumeldungen für die A5<br />
+
+Contributors include, but are not limited to:
+
+Mike Pissanos (gaVRos)
+AlphaBetaPhi <beta@alphabeta.ca>
+Tristen Russ "Playfrog4u" <Playfrog4u@hotmail.com>
+Maxx
+JimmyKane
+Ryan Davis (neoshroom)
+Erich Budianto (praetorians)
+Casey (Nurfballs) Mullineaux
+Joh Gerna
+john-dev
+SNXRaven (Jonathon Nickols)
+Javik
+@FreeManRepo
+P4r4doX <zatovic@azet.sk>

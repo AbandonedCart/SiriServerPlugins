@@ -1,5 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# Plugins courtesy of Eichhoernchen and SilentSpark community
+# Revisions and reconfigurations performed by Twisted
 
 from plugin import *
 from siriObjects.baseObjects import ObjectIsCommand

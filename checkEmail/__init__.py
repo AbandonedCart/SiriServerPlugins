@@ -1,138 +1,126 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+# Plugins courtesy of Eichhoernchen and SilentSpark community
+# Revisions and reconfigurations performed by Twisted
 
-#
-# This is a sms plugin for SiriServerCore  
-# created by Eichhoernchen
-#
-# This file is free for private use, you need a commercial license for paid servers
-#
-# It's distributed under the same license as SiriServerCore
-#
-# You can view the license here:
-# https://github.com/Eichhoernchen/SiriServerCore/blob/master/LICENSE
-#
-# So if you have a SiriServerCore commercial license 
-# you are allowed to use this plugin commercially otherwise you are breaking the law
-#
-# This file can be freely modified, but this header must retain untouched
-#  
-# 
-
-from plugin import *
-from siriObjects.baseObjects import ObjectIsCommand
-from siriObjects.contactObjects import PersonSearch, PersonSearchCompleted
-from siriObjects.smsObjects import SmsSms, SmsSnippet
-from siriObjects.systemObjects import SendCommands, StartRequest, \
-    PersonAttribute, Person, DomainObjectCreate, DomainObjectCreateCompleted, \
-    DomainObjectUpdate, DomainObjectUpdateCompleted, DomainObjectRetrieve, \
-    DomainObjectRetrieveCompleted, DomainObjectCommit, DomainObjectCommitCompleted, \
-    DomainObjectCancel, DomainObjectCancelCompleted
-from siriObjects.uiObjects import UIDisambiguationList, UIListItem, \
-    UIConfirmationOptions, ConfirmSnippet, UIConfirmSnippet, UICancelSnippet
+import re
+import logging
+import time
+import pytz
 import datetime
 import random
-#import pytz
+
+from datetime import *
+from pytz import timezone
+from uuid import uuid4
+from plugin import *
+
+from siriObjects.baseObjects import *
+from siriObjects.uiObjects import *
+from siriObjects.systemObjects import *
+from siriObjects.emailObjects import *
+from siriObjects.contactObjects import PersonSearch, PersonSearchCompleted
+from siriObjects.smsObjects import SmsSms, SmsSnippet
 
 responses = {
 'notFound': 
     {'de-DE': u"Entschuldigung, ich konnte niemanden in deinem Telefonbuch finden der so heißt",
-     'en-US': u"Sorry, I did not find a match in your phone book"
+        'en-US': u"Sorry, I did not find a match in your phone book"
     },
 'devel':
     {'de-DE': u"Entschuldigung, aber diese Funktion befindet sich noch in der Entwicklungsphase",
-     'en-US': u"Sorry this feature is still under development"
+        'en-US': u"Sorry this feature is still under development"
     },
- 'select':
-    {'de-DE': u"Wen genau?", 
-     'en-US': u"Which one?"
-    },
+        'select':
+            {'de-DE': u"Wen genau?", 
+                'en-US': u"Which contact?"
+            },
 'selectNumber':
     {'de-DE': u"Welche Telefonnummer für {0}",
-     'en-US': u"Which phone one for {0}"
+        'en-US': u"Which number for {0}"
     },
 'mustRepeat': 
     {'de-DE': [u"Entschuldigung ich hab dich leider nicht verstanden."],
-     'en-US': [u"Sorry, I did not understand, please try again", u"Sorry, I don't know what you want"]
-     },
+        'en-US': [u"Sorry, I did not understand, please try again", u"Sorry, I don't know what you want"]
+        },
 'askForMessage':
     {'de-DE': [u"Was willst du schreiben?", u"Was soll drin stehen?", u"Du kannst mir jetzt diktieren!"],
-     'en-US': [u"What do you want to say?", u"What do you want to include in the message?", u"Please dictate me the contents!"]
-     },
+        'en-US': [u"What do you want to say?", u"What do you want to include in the message?", u"Please dictate me the contents!"]
+        },
 'showUpdate': 
     {'de-DE': [u"Ich hab deine Nachricht geschrieben. Willst du sie jetzt senden?", u"OK. Willst du die Nachricht jetzt senden?"],
-     'en-US': [u"I updated your message. Ready to send it?", u"Ok, I got that, do you want to send it?", u"Thanks, do you want to send it now?"]
-     },
+        'en-US': [u"I updated your message. Ready to send it?", u"Ok, I got that, do you want to send it?", u"Thanks, do you want to send it now?"]
+        },
 'cancelSms': 
     {'de-DE': [u"OK, I schick sie nicht.", u"OK, ich hab sie verworfen"],
-     'en-US': [u"OK, I won't send it.", u"OK, I deleted it."]
-     },
+        'en-US': [u"OK, I won't send it.", u"OK, I deleted it."]
+        },
 'cancelFail':
     {'de-DE': [u"Sorry, aber mir ist ein Fehler beim Abbrechen passiert"],
-     'en-US': [u"Sorry I could not properly cancel your message"]
-     },
+        'en-US': [u"Sorry I could not properly cancel your message"]
+        },
 'createSmsFail':
     {'de-DE': [u"Ich konnte keine neue Nachricht anlegen, sorry"],
-     'en-US': [u"I could not create a new message, sorry!"]
-     },
+        'en-US': [u"I could not create a new message, sorry!"]
+        },
 'updateSmsFail':
     {'de-DE': [u"Entschuldigung ich konnte die Nachricht nicht schreiben"],
-     'en-US': [u"Sorry, I could not update your message!"]
-     },
+        'en-US': [u"Sorry, I could not update your message!"]
+        },
 'sendSms':
     {'de-DE': [u"OK, ich verschicke die Nachricht"],
-     'en-US': [u"OK, I'll send your message."]
-     },
+        'en-US': [u"OK, I'll send your message."]
+        },
 'sendSmsFail':
     {'de-DE': [u"Umpf da ist was schief gelaufen, sorry"],
-     'en-US': [u"Hm something gone wrong, I could not send the message, I'm very sorry"]
-     },
+        'en-US': [u"Hm something gone wrong, I could not send the message, I'm very sorry"]
+        },
 'clarification':
     {'de-DE': [u"Fortfahren mit senden, abbrechen, anschauen oder ändern."],
-     'en-US': [u"To continue, you can Send, Cancel, Review, or Change it."]
-     }
+        'en-US': [u"To continue, you can Send, Cancel, Review, or Change it."]
+    }
 }
 
 questions = {
 'answerSEND': 
     {'de-DE': ['yes', 'senden'], # you must include yes
-     'en-US': ['yes', 'send']
-     },
+        'en-US': ['yes', 'send']
+        },
 'answerCANCEL':
     {'de-DE': ['cancel', 'abbrechen', 'stop', 'nein'],  # you must include cancel
-     'en-US': ['cancel', 'no', 'abort']
-     },
+        'en-US': ['cancel', 'no', 'abort']
+        },
 'answerUPDATE':
     {'de-DE': ['ändern', 'verändern'],
-     'en-US': ['change', 'update']
-     },
+        'en-US': ['change', 'update']
+        },
 'answerREVIEW':
     {'de-DE': ['anschauen', 'zeigen', 'zeig'],
-     'en-US': ['review', 'view']
-     }
+        'en-US': ['review', 'view']
+    }
 }
 
 snippetButtons = {
 'denyText':
     {'de-DE': "Cancel",
-     'en-US': "Cancel"
-     },
+        'en-US': "Cancel"
+        },
 'cancelLabel':
     {'de-DE': "Cancel",
-     'en-US': "Cancel"
-     },
+        'en-US': "Cancel"
+        },
 'submitLabel':
     {'de-DE': "Send",
-     'en-US': "Send"
-     },
+        'en-US': "Send"
+        },
 'confirmText':
     {'de-DE': "Send",
-     'en-US': "Send"
-     },
+        'en-US': "Send"
+        },
 'cancelTrigger':
     {'de-DE': "Deny",
-     'en-US': "Deny"
-     }
+        'en-US': "Deny"
+    }
 }
 
 speakableDemitter={
@@ -169,8 +157,47 @@ namesToNumberTypes = {
 'en-US': {'work': "_$!<Work>!$_",'home': "_$!<Home>!$_", 'mobile': "_$!<Mobile>!$_"}
 }
 
+class checkEmail(Plugin):
+
+	#Command to activate the checking of email...
+	@register("en-US","(get|check) (.*email.*)|(.*mail.*)")
+	@register("en-GB","(get|check) (.*email.*)|(.*mail.*)")
+	def emailSearch(self, speech, language):
+
+		#Let user know siri is searching for your mail GOOD!
+		view_initial = AddViews(self.refId, dialogPhase="Reflection")
+		view_initial.views = [AssistantUtteranceView(text="Let me check your mail...", speakableText="Let me check your mail...", dialogIdentifier="EmailFindDucs#findingNewEmail")]
+		self.sendRequestWithoutAnswer(view_initial)
+		
+		#Grabs the timeZone given by the client
+		tz = timezone(self.connection.assistant.timeZoneId)
+		
+		#Search object to find the mail GOOD!
+		email_search = EmailSearch(self.refId)
+		email_search.timeZoneId = self.connection.assistant.timeZoneId
+		email_search.startDate = datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=tz)
+		email_search.endDate = datetime.now(tz)
+		email_return = self.getResponseForRequest(email_search)
+		email_ = email_return["properties"]["emailResults"]
+		if email_return == []:
+			view = AddViews(self.refId, dialogPhase="Summary")
+			view.views += [AssistantUtteranceView(text="Looks like you don't have any email.", speakableText="Looks like you don't have any email.", dialogIdentifier="EmailFindDucs#foundNoEmail")]
+			self.sendRequestWithoutAnswer(view)
+		else:
+			self.logger.warning(email_return)
+
+			#Display the mail! It works :D!
+			view = AddViews(self.refId, dialogPhase="Summary")
+			view1 = AssistantUtteranceView(text="Ok, here is what I found: ", speakableText="Ok, here is what I found: ", dialogIdentifier="EmailFindDucs#foundEmail")
+			snippet = EmailSnippet()
+			snippet.emails = email_
+			view2 = snippet
+			view.views = [view1, view2]
+			self.sendRequestWithoutAnswer(view)
+		self.complete_request()
+
 class shortMessaging(Plugin):
-    
+
     def finalSend(self, sms, language):
         
         commitCMD = DomainObjectCommit(self.refId)
@@ -526,7 +553,7 @@ class shortMessaging(Plugin):
             lst.items.append(item)
         return root
     
-    @register("en-US", "(Write|Send)( a)?( new)? (message|sms) to (?P<recipient>[\w ]+?)$")
+    @register("en-US", "(Write|Send).*(message|sms|text)( to| for)? (?P<recipient>[\w ]+?)$")
     @register("de-DE", "(Sende|Schreib.)( eine)?( neue)? (Nachricht|sms) an (?P<recipient>[\w ]+?)$")
     def sendSMS(self, speech, lang, regex):
         recipient = regex.group('recipient')
@@ -558,4 +585,3 @@ class shortMessaging(Plugin):
                 return # complete_request is done there
         self.say(responses['notFound'][lang])                         
         self.complete_request()
-        
