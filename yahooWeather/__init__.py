@@ -290,7 +290,7 @@ countries = {
 
 waitText = {
     'de-DE': [u"Einen Moment bitte", u"OK"],
-    'en-US': [u"One moment please", u"OK"]
+    'en-US': [u"One moment please", u"Let me check"]
 }
 
 errorText = {
@@ -607,7 +607,7 @@ class yahooWeather(Plugin):
         
         self.showCurrentWeatherWithWOEID(language, woeidElem.text)
         
-    @register("en-US", "weather|forecast")
+    @register("en-US", "(what( is|'s) the )?(weather|forecast)( like| for)?( outside)?( today| now)?")
     @register("de-DE", "wetter(vorhersage)?")
     def forcastWeatherAtCurrentLocation(self, speech, language):
         location = self.getCurrentLocation()

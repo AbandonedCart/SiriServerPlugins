@@ -9,6 +9,7 @@ import json
 from urllib2 import urlopen
 from xml.dom import minidom
 from random import randint
+from random import getrandbits
 
 from plugin import *
 from plugin import __criteria_key__
@@ -81,7 +82,24 @@ class smallTalk(Plugin):
         if language == 'de-DE':
             self.say("Zwei iPhones stehen an der Bar ... den Rest habe ich vergessen.")            
         else:
-            self.say("Two iPhones walk into a bar ... I forget the rest.")
+            generate = random.getrandbits(5)
+            if generate == 0:
+                self.say("Two iPhones walk into a bar ... I forget the rest.")
+            elif generate == 1:
+                self.say("I don't really know any good jokes. None, in fact.")
+            elif generate == 2:
+                self.say("Get Siri-ous. HA HA!")
+            elif generate == 3:
+                self.say("What goes in hard and pink, and comes off soft and sticky? Bubble gum.")
+            elif generate == 4:
+                answer = self.ask("Knock Knock.")
+                self.ask("Dover")
+                if ("Who's") or ("Who is") in answer:
+                    self.say("Ben Dover and I'll give you a big surprise.")
+                else:
+                    self.say("I finally had one and you ruined it...")
+            else:
+                self.say("I can't. I always forget the punch line")
         self.complete_request()
 
     @register("de-DE", ".*erzähl.*Geschichte.*")
@@ -145,22 +163,13 @@ class smallTalk(Plugin):
             self.say("Oh. Sure, I guess you say this to all your Apple products")
         self.complete_request()
 
-    @register("de-DE", ".*Android.*")
-    @register("en-US", ".*Android.*")
-    def st_android(self, speech, language):
-        if language == 'de-DE':
-            self.say("Ich denke da anders.")            
-        else:
-            self.say("I think differently")
-        self.complete_request()
-
     @register("de-DE", ".*Test.*1.*2.*3.*")
     @register("en-US", ".*test.*1.*2.*3.*")
     def st_123_test(self, speech, language):
         if language == 'de-DE':
             self.say("Ich kann Dich klar und deutlich verstehen.")            
         else:
-            self.say("I can here you very clear.")
+            self.say("I can hear you, loud and clear.")
         self.complete_request()
 
     @register("de-DE", ".*Herzlichen.*Glückwunsch.*Geburtstag.*")
@@ -210,7 +219,7 @@ class smallTalk(Plugin):
             self.say("Mines.")
             self.say("Resevoirs.")
             self.say("Swamps.")
-            self.say("Metal foundries.")
+            self.say("Pig farms.")
             self.say("They are all good places.")
         self.complete_request()
    
@@ -271,7 +280,12 @@ class smallTalk(Plugin):
     @register("en-US",".*wood.could.*woodchuck.chuck.*")
     def st_woodchuck(self, speech, language):
         if language == 'en-US':
-            self.say("It depends on whether you are talking about African or European woodchucks.")
+            generate = bool (random.getrandbits(1))
+            if generate:
+                self.say("Well, since a 'woodchuck' is really a groundhog, the correct question would be:")
+                self.say("How many pounds in a groundhog's mound when a groundhog pounds hog mounds?")
+            else:
+                self.say("It depends on whether you are talking about African or European woodchucks.")
         self.complete_request()
     
     @register("en-US",".*nearest.*glory.hole.*")
@@ -502,38 +516,6 @@ class jokes(Plugin):
 	self.say("Generals fried chicken, it's butt kicking. Hay Hay!")
 	self.complete_request()
 
-    @register("en-US", ".*tell.*joke*")
-    def st_tell_joke(self, speech, language):
-	number = random.choice([1,2,3,4,5,6])
-	if number == 1:
-            self.say("Two iPhones walk into a bar ... I forget the rest.")
-	elif number == 2:
-	    self.say("What's the difference between a penis and a bonus? Your wife will blow your bonus.")
-	elif number == 3:
-	    self.say("What goes in hard and pink, and comes off soft and sticky? Bubble gum.")
-	elif number == 4:
-	    answer = self.ask("Knock Knock.")
-	    if ("Who's") or ("Who is") in answer:
-		self.ask("Dover")
-		self.say("Ben Dover and I'll give you a big surprise.")
-	    else:
-		self.say("Who ruins the joke.")
-	elif number == 5:
-	    answer = self.ask("Knock Knock.")
-	    if ("Who's") or ("Who is") in answer:
-		self.ask("Little old lady")
-		self.say("Wow! I didn't know you could yodel!")
-	    else:
-		self.say("Who ruins the joke.")
-	else:
-	    answer = self.ask("Knock Knock.")
-	    if ("Who's") or ("Who is") in answer:
-		self.ask("Boo")
-		self.say("Don't cry it's only a joke.")
-	    else:
-		self.say("Who ruins the joke.")
-        self.complete_request()
-
     @register ("en-US", "Chuck Norris")
     def cn_joke(self, speech, language):
 	req=urllib.urlopen("http://api.icndb.com/jokes/random")
@@ -550,10 +532,18 @@ class define(Plugin):
         regMatched = matcher.match(speech)
         Question = regMatched.group(1)
 	answer = self.ask("You do mean " + Question + ", right?")
-	if "Yes" in answer:
-	     self.say("Then yes, yes " + Question + " is")
+	if ("Yes") or ("Yeah") or ("Yup") in answer:
+		generate = bool (random.getrandbits(1))
+		if generate:
+			self.say("Yes. A recent survey found " + Question + " cool.")
+		else:
+			self.say("Hmm. No, " + Question + " does not appear to be cool.")
 	else:
-             self.say("Oh, then no.")
+		generate = bool (random.getrandbits(1))
+		if generate:
+			self.say("Well, " + Question + " was cool. Not anymore.")
+		else:
+			self.say("Doesn't matter. " + Question + " is cool without you.")
 	self.complete_request()
 
 class horoscope(Plugin):

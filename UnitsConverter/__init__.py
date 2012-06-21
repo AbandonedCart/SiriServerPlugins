@@ -16,8 +16,8 @@ from siriObjects.answerObjects import AnswerSnippet, AnswerObject, AnswerObjectL
 
 class UnitsConverter(Plugin):
     
-    @register("en-US", "(convert|calculate)* ([\w ]+)")
-    @register("en-GB", "(convert|calculate)* ([\w ]+)")
+    @register("en-US", "(Convert|Calculate)* ([\w ]+)")
+    @register("en-GB", "(Convert|Calculate)* ([\w ]+)")
     def defineword(self, speech, language, regex):
         Title = regex.group(regex.lastindex)
         Query = urllib.quote_plus(Title.encode("utf-8"))

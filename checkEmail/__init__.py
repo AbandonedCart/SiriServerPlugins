@@ -184,11 +184,13 @@ class checkEmail(Plugin):
 			view.views += [AssistantUtteranceView(text="Looks like you don't have any email.", speakableText="Looks like you don't have any email.", dialogIdentifier="EmailFindDucs#foundNoEmail")]
 			self.sendRequestWithoutAnswer(view)
 		else:
+			email_return[:50]
 			self.logger.warning(email_return)
 
 			#Display the mail! It works :D!
+			self.say("It looks like you have at least " + email_return.length() + " emails.")
 			view = AddViews(self.refId, dialogPhase="Summary")
-			view1 = AssistantUtteranceView(text="Ok, here is what I found: ", speakableText="Ok, here is what I found: ", dialogIdentifier="EmailFindDucs#foundEmail")
+			view1 = AssistantUtteranceView(text="Here is what I found: ", speakableText="Here is what I found: ", dialogIdentifier="EmailFindDucs#foundEmail")
 			snippet = EmailSnippet()
 			snippet.emails = email_
 			view2 = snippet
