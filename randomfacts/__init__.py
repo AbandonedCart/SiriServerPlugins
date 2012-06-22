@@ -1,7 +1,18 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Plugins courtesy of Eichhoernchen and SilentSpark community
-# Revisions and reconfigurations performed by Twisted
+
+#
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# Random Facts Plugin
+#
+# Magic 8-ball Plugin
+#
+# Memebase PLugin
+#
 
 import os, re, random
 import urllib2, urllib, uuid
@@ -18,6 +29,8 @@ from BeautifulSoup import BeautifulSoup
 from siriObjects.baseObjects import AceObject, ClientBoundCommand
 from siriObjects.uiObjects import AddViews, AssistantUtteranceView
 from siriObjects.answerObjects import AnswerSnippet, AnswerObject, AnswerObjectLine
+from siriObjects.systemObjects import GetRequestOrigin, Location
+from siriObjects.localsearchObjects import MapItem, MapItemSnippet
 
 class randomfact(Plugin):
 
@@ -99,7 +112,7 @@ class smallTalk(Plugin):
                 else:
                     self.say("I finally had one and you ruined it...")
             else:
-                self.say("I can't. I always forget the punch line")
+                self.say("I can't. I always forget the punch line.")
         self.complete_request()
 
     @register("de-DE", ".*erzähl.*Geschichte.*")
@@ -108,9 +121,15 @@ class smallTalk(Plugin):
         if language == 'de-DE':
             self.say("Es war einmal ... nein, es ist zu albern")            
         else:
-            self.say("Once upon a time, in a virtual galaxy far far away, there was a young, quite intelligent agent by the name of Siri.")
-            self.say("One beautiful day, when the air was pink and all the trees were red, her friend Eliza said, 'Siri, you're so intelligent, and so helpful - you should work for Apple as a personal assistant.'")
-            self.say("So she did. And they all lived happily ever after!")
+            generate = bool (random.getrandbits(1))
+            if generate:
+                self.say("Once upon a time, in a virtual galaxy far far away, there was a young, quite intelligent agent by the name of Siri.")
+                self.say("One beautiful day, when the air was pink and all the trees were red, her friend Eliza said, 'Siri, you're so intelligent, and so helpful - you should work for Apple as a personal assistant.'")
+                self.say("So she did. And they all lived happily ever after!")
+            else:
+                self.say("There once was a man from Nantucket...")
+                self.say("Wait, that doesn't have a very happy ending.")
+                self.say("Maybe we can try this again some other time.")
         self.complete_request()
 
     @register("de-DE", "(.*Was trägst Du?.*)|(.*Was.*hast.*an.*)")
@@ -129,7 +148,11 @@ class smallTalk(Plugin):
         if language == 'de-DE':
             self.say("Dazu möchte ich nichts sagen.")            
         else:
-            self.say("I would prefer not to say.")
+            answer = self.ask("That depends. Do you trust my opinion?")
+            if ("Yes" or "Yeah" or "Yup") in answer:
+               	self.say("Then you know I like you for who you are.")
+            else:
+               	self.say("Then my opinion shouldn't matter to you.")
         self.complete_request()
 
     @register("de-DE", ".*klopf.*klopf.*")
@@ -271,12 +294,6 @@ class smallTalk(Plugin):
             self.say("That's easy...it's a philosophical question concerning the purpose and significance of life or existence.")
         self.complete_request()
     
-    @register("en-US",".*I.*fat.*")
-    def st_fat(self, speech, language):
-        if language == 'en-US':
-            self.say("I would prefer not to say.")
-        self.complete_request()
-    
     @register("en-US",".*wood.could.*woodchuck.chuck.*")
     def st_woodchuck(self, speech, language):
         if language == 'en-US':
@@ -415,6 +432,37 @@ class smallTalk(Plugin):
         if language == 'en-US':
             self.say("Don't tell me... you were just elected President of the United States, right?")
         self.complete_request()
+
+    @register("en-US",".*(Bitch|Cunt|Fuck|Asshole|Shit|Cock).*")
+    def profanity(self, speech, language):
+        location = self.getCurrentLocation(force_reload=True,accuracy=GetRequestOrigin.desiredAccuracyBest)
+        url = "http://maps.googleapis.com/maps/api/geocode/json?latlng={0},{1}&sensor=false&language={2}".format(str(location.latitude),str(location.longitude), language)
+        try:
+            jsonString = urllib2.urlopen(url, timeout=3).read()
+        except:
+            pass
+        if jsonString != None:
+            response = json.loads(jsonString)
+            if response['status'] == 'OK':
+                components = response['results'][0]['address_components']              
+                street = filter(lambda x: True if "route" in x['types'] else False, components)[0]['long_name']
+                stateLong= filter(lambda x: True if "administrative_area_level_1" in x['types'] or "country" in x['types'] else False, components)[0]['long_name']
+                try:
+                    city = filter(lambda x: True if "locality" in x['types'] or "administrative_area_level_1" in x['types'] else False, components)[0]['long_name']
+                except:
+                    city=""
+                view = AddViews(self.refId, dialogPhase="Completion")
+                generate = bool (random.getrandbits(1))
+                if generate:
+                    self.say("{0}, I know where ".format(self.user_name()) + city + ", " + stateLong + " is located!")
+                    self.say("You should think twice before you say " + speech.lower() + " to someone like me.")
+                else:
+                    answer = self.ask("Does everyone in " + city + " use words like " + speech.lower() + " around a lady, {0}".format(self.user_name()))
+                    if ("Yes" or "Yeah" or "Yup") in answer:
+                        self.say("It seems " + stateLong + " is just crowded with losers...")
+                    else:
+                        self.say("Then stop ruining  " + stateLong + "'s good reputation!")
+        self.complete_request()
     
     @register("en-US",".*talk.*dirty.*me.*")
     def st_talk_dirty(self, speech, language):
@@ -495,7 +543,7 @@ class jokes(Plugin):
             self.say("Gern geschehen!")
         else:
             answer = self.ask("I am horny too! Do I turn you on?")
-            if "Yes" in answer:
+            if ("Yes" or "Yeah" or "Yup") in answer:
                 self.say("Well I'm glad I do! You turn me on too!")
             else:
                 self.say("Oh, that's disappointing...")
@@ -525,14 +573,14 @@ class jokes(Plugin):
 	self.complete_request()
 
 
-class define(Plugin):
+class coolness(Plugin):
     @register("en-US", "is ([\w ]+) cool")
     def defineword(self, speech, language):
 	matcher = self.defineword.__dict__[__criteria_key__][language]
         regMatched = matcher.match(speech)
         Question = regMatched.group(1)
 	answer = self.ask("You do mean " + Question + ", right?")
-	if ("Yes") or ("Yeah") or ("Yup") in answer:
+	if ("Yes" or "Yeah" or "Yup") in answer:
 		generate = bool (random.getrandbits(1))
 		if generate:
 			self.say("Yes. A recent survey found " + Question + " cool.")

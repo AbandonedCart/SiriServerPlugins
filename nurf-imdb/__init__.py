@@ -1,8 +1,14 @@
 #!/usr/bin/python
 #nurf-imdb.py
 
-#IMDb Plugin for SiriServer
-#by Casey (Nurfballs) Mullineaux 
+#
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# IMDb Plugin for SiriServer
+# by Casey (Nurfballs) Mullineaux 
 # Version 0.2.1
 
 # Download: 
@@ -131,7 +137,7 @@ class nurf_imdb(Plugin):
                     self.say("Sorry, I couldnt find any characters by that name in " + movietitle)
                     self.complete_request()
     
-    @register("en-US",  "(movie lookup|movie look up)* ([\w ]+)")
+    @register("en-US",  "(lookup|look up|find) (movie)* ([\w ]+)( on imdb)?")
     def move_lookup(self,  speech,  language,  regex):
         if language == "en-US":
             MovieTitle = regex.group(regex.lastindex).strip()

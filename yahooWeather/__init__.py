@@ -2,7 +2,12 @@
 # -*- coding: utf-8 -*-
 
 #
-# This is a weather plugin for SiriServerCore  
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# Weather Plugin  
 # created by Eichhoernchen
 #
 # It uses various the services from yahoo
@@ -21,8 +26,7 @@
 # You must make sure to get propper allowens from yahoo to use their API commercially
 #
 # This file can be freely modified, but this header must retain untouched
-#  
-# 
+#
 
 from datetime import date
 from plugin import *

@@ -1,17 +1,30 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Plugins courtesy of Eichhoernchen and SilentSpark community
-# Revisions and reconfigurations performed by Twisted
-
+#
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# Wordnik Plugin
+#
 #additional Wordnik functions to add can be found at:
 #http://developer.wordnik.com/docs/
+#
+# Urban Dictionary Plugin
+#
+# Wikipedia Plugin
+#
+# Unit Converter Plugin
+#
 
 import urllib2, nltk, json
-import json
+import json, urllib
 import re
 from urllib import urlencode
 from BeautifulSoup import BeautifulSoup
 from plugin import *
+from plugin import __criteria_key__
 from plugins.defineWordnik.config import *
 
 from siriObjects.baseObjects import AceObject, ClientBoundCommand
@@ -60,10 +73,10 @@ class urbandictionary(Plugin):
         "en-US": ["Urban dictionary <something>", "Example: Urban dictionary banana"]
                   }
 
-    @register("en-US", ".*Urban.*dictionary.* [a-zA-Z0-9]+")
-    def sn_dictionary(self, speech, language):
+    @register("en-US", ".*Urban.*dictionary ([\w ]+)")
+    def sn_dictionary(self, speech, language, regMatched):
         if language == 'en-US':
-            match = re.match(u".*Urban.*dictionary (.*\D.*)", speech, re.IGNORECASE)
+            match = regMatched.group(1).lower()
             r = urllib2.urlopen('http://www.urbandictionary.com/iphone/search/define?term='+match.group(1))
             data = json.loads(r.read())
             if ( len(data['list']) > 1 ):
@@ -216,3 +229,23 @@ class wikipedia(Plugin):
 		self.sendRequestWithoutAnswer(view)
 		
 	self.complete_request()
+
+class UnitsConverter(Plugin):
+    
+    @register("en-US", "(Convert|Calculate)* ([\w ]+)")
+    @register("en-GB", "(Convert|Calculate)* ([\w ]+)")
+    def defineword(self, speech, language, regex):
+        Title = regex.group(regex.lastindex)
+        Query = urllib.quote_plus(Title.encode("utf-8"))
+        SearchURL = u'http://www.google.com/ig/calculator?q=' + str(Query)
+        try:
+            result = urllib2.urlopen(SearchURL).read().decode("utf-8", "ignore")
+            result = re.sub("([a-z]+):", '"\\1" :', result)
+            result = json.loads(result)
+            ConvA = result['lhs']
+            ConvB = result['rhs'] 
+            self.say("Here is what I found..." '\n' +str(ConvA) + " equals, " +str(ConvB))
+            self.complete_request()
+        except (urllib2.URLError):
+            self.say("Sorry, but a connection to the Google calculator could not be established.")
+            self.complete_request()

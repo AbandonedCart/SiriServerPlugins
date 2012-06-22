@@ -1,7 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Plugins courtesy of Eichhoernchen and SilentSpark community
-# Revisions and reconfigurations performed by Twisted
+
+#
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# Phone Call Plugin
+#
+# No header included, courtesy of Eichhoernchen
+# 
 
 from plugin import *
 from siriObjects.baseObjects import ObjectIsCommand

@@ -1,7 +1,40 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-# Plugins courtesy of Eichhoernchen and SilentSpark community
-# Revisions and reconfigurations performed by Twisted
+
+#
+# This process of enhancing plugins has been performed by Twisted.
+#
+# Unmerged versions of these plugins may function differently or lack some functionality.
+# All original headers and licensing information is labeled by the derived plugin name.
+#
+# SMS Plugin
+# created by Eichhoernchen
+#
+# This file is free for private use, you need a commercial license for paid servers
+#
+# It's distributed under the same license as SiriServerCore
+#
+# You can view the license here:
+# https://github.com/Eichhoernchen/SiriServerCore/blob/master/LICENSE
+#
+# So if you have a SiriServerCore commercial license 
+# you are allowed to use this plugin commercially otherwise you are breaking the law
+#
+# This file can be freely modified, but this header must retain untouched
+#
+# Email Plugin
+#
+# ---------------------------------------------------------------------
+# Authors :
+# Created by Daniel Zaťovič (P4r4doX)
+# Edited by Tristen Russ (Playfrog4u)
+# Contacts search code is taken from phonecalls plugin by Eichhoernchen
+# Special thanks to doratown for providing original plists from 4S
+# ---------------------------------------------------------------------
+# About :
+# Using this plugin you can write email directly from Siri
+# ---------------------------------------------------------------------
+#
 
 import re
 import logging
@@ -39,6 +72,10 @@ responses = {
     {'de-DE': u"Welche Telefonnummer für {0}",
         'en-US': u"Which number for {0}"
     },
+'selectAddress':
+    {'de-DE': u"Welche Email Adresse für {0}",
+        'en-US': u"Which email adress one for {0}"
+}
 'mustRepeat': 
     {'de-DE': [u"Entschuldigung ich hab dich leider nicht verstanden."],
         'en-US': [u"Sorry, I did not understand, please try again", u"Sorry, I don't know what you want"]
@@ -156,6 +193,220 @@ namesToNumberTypes = {
 'de-DE': {'mobile': "_$!<Mobile>!$_", 'handy': "_$!<Mobile>!$_", 'zuhause': "_$!<Home>!$_", 'privat': "_$!<Home>!$_", 'arbeit': "_$!<Work>!$_"},
 'en-US': {'work': "_$!<Work>!$_",'home': "_$!<Home>!$_", 'mobile': "_$!<Mobile>!$_"}
 }
+
+class mail(Plugin):
+    
+    def searchUserByName(self, personToLookup):
+        search = PersonSearch(self.refId)
+        search.scope = PersonSearch.ScopeLocalValue
+        search.name = personToLookup
+        answerObj = self.getResponseForRequest(search)
+        if ObjectIsCommand(answerObj, PersonSearchCompleted):
+            answer = PersonSearchCompleted(answerObj)
+            return answer.results if answer.results != None else []
+        else:
+            raise StopPluginExecution("Unknown response: {0}".format(answerObj))
+        return []
+    
+    def getNumberTypeForName(self, name, language):
+        # q&d
+        if name != None:
+            if name.lower() in namesToNumberTypes[language]:
+                return namesToNumberTypes[language][name.lower()]
+            else:
+                for key in numberTypesLocalized.keys():
+                    if numberTypesLocalized[key][language].lower() == name.lower():
+                        return numberTypesLocalized[key][language]
+        return None
+    
+    def findPhoneForNumberType(self, person, numberType, language):         
+        # first check if a specific number was already requested
+        phoneToCall = None
+        if numberType != None:
+            # try to find the phone that fits the numberType
+            phoneToCall = filter(lambda x: x.label == numberType, person.emails)
+        else:
+            favPhones = filter(lambda y: y.favoriteVoice if hasattr(y, "favoriteVoice") else False, person.emails)
+            if len(favPhones) == 1:
+                phoneToCall = favPhones[0]
+        if phoneToCall == None:
+            # lets check if there is more than one number
+            if len(person.emails) == 1:
+                if numberType != None:
+                    self.say(errorNumberNotPresent.format(numberTypesLocalized[numberType][language], person.fullName))
+                phoneToCall = person.emails[0]
+            else:
+                # damn we need to ask the user which one he wants...
+                while(phoneToCall == None):
+                    rootView = AddViews(self.refId, temporary=False, dialogPhase="Clarification", scrollToTop=False, views=[])
+                    sayit = responses['selectAddress'][language].format(person.fullName)
+                    rootView.views.append(AssistantUtteranceView(text=sayit, speakableText=sayit, listenAfterSpeaking=True,dialogIdentifier="ContactDataResolutionDucs#foundAmbiguousPhoneNumberForContact"))
+                    lst = DisambiguationList(items=[], speakableSelectionResponse="OK...", listenAfterSpeaking=True, speakableText="", speakableFinalDemitter=speakableDemitter[language], speakableDemitter=", ",selectionResponse="OK...")
+                    rootView.views.append(lst)
+                    for phone in person.emails:
+                        numberType = phone.label
+                        item = ListItem()
+                        item.title = ""
+                        item.text = u"{0}: {1}".format(numberTypesLocalized[numberType][language], phone.emailAddress)
+                        item.selectionText = item.text
+                        item.speakableText = u"{0}  ".format(numberTypesLocalized[numberType][language])
+                        item.object = phone
+                        item.commands.append(SendCommands(commands=[StartRequest(handsFree=False, utterance=numberTypesLocalized[numberType][language])]))
+                        lst.items.append(item)
+                    answer = self.getResponseForRequest(rootView)
+                    numberType = self.getNumberTypeForName(answer, language)
+                    if numberType != None:
+                        matches = filter(lambda x: x.label == numberType, person.emails)
+                        if len(matches) == 1:
+                            phoneToCall = matches[0]
+                        else:
+                            self.say(errorNumberTypes[language])
+                    else:
+                        self.say(errorNumberTypes[language])
+        return phoneToCall
+    
+    def presentPossibleUsers(self, persons, language):
+        root = AddViews(self.refId, False, False, "Clarification", [], [])
+        root.views.append(AssistantUtteranceView(responses['select'][language], responses['select'][language], "ContactDataResolutionDucs#disambiguateContact", True))
+        lst = DisambiguationList([], "OK!", True, "OK!", speakableDemitter[language], ", ", "OK!")
+        root.views.append(lst)
+        for person in persons:
+            item = ListItem(person.fullName, person.fullName, [], person.fullName, person)
+            item.commands.append(SendCommands([StartRequest(False, "^phoneCallContactId^=^urn:ace:{0}".format(person.identifier))]))
+            lst.items.append(item)
+        return root       
+    
+    @register("en-US", "(email)* ([\w ]+) *about* ([\w ]+)")  
+    def mail(self, speech, language, regex):
+        personToCall = regex.group(2)
+        subject = regex.group(3)
+        numberType = ""
+        numberType = self.getNumberTypeForName(numberType, language)
+        persons = self.searchUserByName(personToCall)
+        personToCall = None
+        if len(persons) > 0:
+            if len(persons) == 1:
+                personToCall = persons[0]
+            else:
+                identifierRegex = re.compile("\^phoneCallContactId\^=\^urn:ace:(?P<identifier>.*)")
+                #  multiple users, ask user to select
+                while(personToCall == None):
+                    strUserToCall = self.getResponseForRequest(self.presentPossibleUsers(persons, language))
+                    self.logger.debug(strUserToCall)
+                    # maybe the user clicked...
+                    identifier = identifierRegex.match(strUserToCall)
+                    if identifier:
+                        strUserToCall = identifier.group('identifier')
+                        self.logger.debug(strUserToCall)
+                    for person in persons:
+                        if person.fullName == strUserToCall or person.identifier == strUserToCall:
+                            personToCall = person
+                    if personToCall == None:
+                        # we obviously did not understand him.. but probably he refined his request... call again...
+                        self.say(errorNumberTypes[language])
+            
+            if personToCall != None:
+                personAttribute=PersonAttribute()
+                targetEmailAdress = self.findPhoneForNumberType(personToCall, numberType, language)
+                personAttribute.data = targetEmailAdress.emailAddress
+                personAttribute.displayText = personToCall.fullName
+                PersonObject = Person()
+                PersonObject.identifier = personToCall.identifier
+                personAttribute.object=PersonObject
+                self.say("Creating email ...", " ")
+                email = EmailEmail()
+                email.subject = subject.title()
+                email.recipientsTo = [personAttribute]
+                email.outgoing = True
+                email.type = "New"
+                EmailDomain = DomainObjectCreate(self.refId, email)
+                answer = self.getResponseForRequest(EmailDomain)
+                
+                if ObjectIsCommand(answer, DomainObjectCreateCompleted):
+                    identifier = DomainObjectCreateCompleted(answer)
+                    self.logger.debug("DomainObject identifier : {0}".format(identifier.identifier))
+                    DomainIdentifier = identifier.identifier
+                else:
+                    raise StopPluginExecution("Unknown response: {0}".format(answer))
+                email.identifier = DomainIdentifier
+                EmailView = AddViews(self.refId, dialogPhase="Clarification")
+                
+                Ask = AssistantUtteranceView("What you want to tell {0}".format(personToCall.firstName), "What you want to tell {0}".format(personToCall.firstName), listenAfterSpeaking=True)
+                
+                MyEmailSnippet = 0
+                MyEmailSnippet = EmailSnippet()
+                MyEmailSnippet.emails = [email]
+                EmailView.views = [Ask, MyEmailSnippet]
+                EmailView.scrollToTop = True
+                print "Sending view ..."
+                messageFU = self.getResponseForRequest(EmailView)
+                print messageFU
+                
+                
+                DomainUpdate = DomainObjectUpdate(self.refId)
+                
+                UpdateField = EmailEmail()
+                UpdateField.message = messageFU
+                DomainUpdate.setFields = UpdateField
+                
+                DomainUpdate.addFields = EmailEmail()
+                
+                UpdateDomainIdentifier = EmailEmail()
+                UpdateDomainIdentifier.identifier = DomainIdentifier
+                DomainUpdate.identifier = UpdateDomainIdentifier
+                time.sleep(2)
+                print "Sending update request ..."
+                DomainUpdateAnswer = self.getResponseForRequest(DomainUpdate)
+                
+                if ObjectIsCommand(DomainUpdateAnswer, DomainObjectUpdateCompleted):
+                    print "Recived DomainObjectUpdateCompleted !"
+                else:
+                    raise StopPluginExecution("Unknown response: {0}".format(answer))
+                
+                DomainRetrieve = DomainObjectRetrieve(self.refId)
+                DomainObjectRetrieve.identifiers=[DomainIdentifier]
+                print "Sending Retrieve object ..."
+                DomainRetrieveAnswer = self.getResponseForRequest(DomainRetrieve)
+                
+                if ObjectIsCommand(DomainRetrieveAnswer, DomainObjectRetrieveCompleted):
+                    print "Recived DomainObjectRetrieveCompleted !"
+                else:
+                    raise StopPluginExecution("Unknown response: {0}".format(answer))		
+                
+                FinallAsk = AssistantUtteranceView("Ready to send ?", "Ready to send ?", listenAfterSpeaking=True)
+                
+                FinallEmail = EmailEmail()
+                FinallEmail.identifier = DomainIdentifier
+                
+                FinallSnippet = EmailSnippet()
+                FinallSnippet.emails = [FinallEmail]
+                
+                FinallView = AddViews(self.refId, dialogPhase="Clarification")
+                FinallView.views = [FinallAsk, FinallSnippet]
+                FinallView.scrollToTop = True
+                
+                ReadyToSend = self.getResponseForRequest(FinallView)
+                
+                if(ReadyToSend == "Yes"):
+                    CommitEmail = EmailEmail()
+                    CommitEmail.identifier = DomainIdentifier
+                    
+                    Commit = DomainObjectCommit(self.refId)
+                    Commit.identifier = CommitEmail
+                    
+                    CommitAnswer = self.getResponseForRequest(Commit)
+                    print "Recived answer !"
+                    if ObjectIsCommand(CommitAnswer, DomainObjectCommitCompleted):
+                        print "Recived DomainObjectCommitCompleted !"      
+                        self.say("I sent it !")
+                    else:
+                        raise StopPluginExecution("Unknown response: {0}".format(answer))
+                else:
+                    self.say("OK, I'll forget it !")		
+                self.complete_request()                
+        
+        self.say(responses['notFound'][language])                         
+        self.complete_request()
 
 class checkEmail(Plugin):
 
