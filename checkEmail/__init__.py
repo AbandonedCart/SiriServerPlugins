@@ -292,12 +292,12 @@ class mail(Plugin):
             item = ListItem(person.fullName, person.fullName, [], person.fullName, person)
             item.commands.append(SendCommands([StartRequest(False, "^phoneCallContactId^=^urn:ace:{0}".format(person.identifier))]))
             lst.items.append(item)
-        return root       
-    
-    @register("en-US", "(Write |Send |New )?(email)* ([\w ]+) *about* ([\w ]+)")  
+        return root
+
+    @register("en-US", ".*(email|mail)* ([\w ]+) *about* ([\w ]+)")
     def mail(self, speech, language, regex):
         personToCall = regex.group(2)
-        subject = regex.group(3)
+        subject = regex.group(regex.lastindex)
         numberType = ""
         numberType = self.getAddressTypeForName(numberType, language)
         persons = self.searchEmailByName(personToCall)
@@ -349,7 +349,7 @@ class mail(Plugin):
                 email.identifier = DomainIdentifier
                 EmailView = AddViews(self.refId, dialogPhase="Clarification")
                 
-                Ask = AssistantUtteranceView("What you want to tell {0}".format(personToCall.firstName), "What you want to tell {0}".format(personToCall.firstName), listenAfterSpeaking=True)
+                Ask = AssistantUtteranceView("What do you want to tell {0}".format(personToCall.firstName), "What do you want to tell {0}".format(personToCall.firstName), listenAfterSpeaking=True)
                 
                 MyEmailSnippet = 0
                 MyEmailSnippet = EmailSnippet()
@@ -377,7 +377,7 @@ class mail(Plugin):
                 DomainUpdateAnswer = self.getResponseForRequest(DomainUpdate)
                 
                 if ObjectIsCommand(DomainUpdateAnswer, DomainObjectUpdateCompleted):
-                    print "Recived DomainObjectUpdateCompleted !"
+                    print "Received DomainObjectUpdateCompleted !"
                 else:
                     raise StopPluginExecution("Unknown response: {0}".format(answer))
                 
@@ -387,7 +387,7 @@ class mail(Plugin):
                 DomainRetrieveAnswer = self.getResponseForRequest(DomainRetrieve)
                 
                 if ObjectIsCommand(DomainRetrieveAnswer, DomainObjectRetrieveCompleted):
-                    print "Recived DomainObjectRetrieveCompleted !"
+                    print "Received DomainObjectRetrieveCompleted !"
                 else:
                     raise StopPluginExecution("Unknown response: {0}".format(answer))		
                 
@@ -413,9 +413,9 @@ class mail(Plugin):
                     Commit.identifier = CommitEmail
                     
                     CommitAnswer = self.getResponseForRequest(Commit)
-                    print "Recived answer !"
+                    print "Received answer !"
                     if ObjectIsCommand(CommitAnswer, DomainObjectCommitCompleted):
-                        print "Recived DomainObjectCommitCompleted !"      
+                        print "Received DomainObjectCommitCompleted !"      
                         self.say("I sent it !")
                     else:
                         raise StopPluginExecution("Unknown response: {0}".format(answer))
@@ -429,8 +429,8 @@ class mail(Plugin):
 class checkEmail(Plugin):
 
 	#Command to activate the checking of email...
-	@register("en-US","(get|check) (.*email.*)|(.*mail.*)")
-	@register("en-GB","(get|check) (.*email.*)|(.*mail.*)")
+	@register("en-US","(Get|Check) (my |for )?(new )?(email|mail)")
+	@register("en-GB","(Get|Check) (my |for )?(new )?(email|mail)")
 	def emailSearch(self, speech, language):
 
 		#Let user know siri is searching for your mail GOOD!
@@ -453,11 +453,11 @@ class checkEmail(Plugin):
 			view.views += [AssistantUtteranceView(text="Looks like you don't have any email.", speakableText="Looks like you don't have any email.", dialogIdentifier="EmailFindDucs#foundNoEmail")]
 			self.sendRequestWithoutAnswer(view)
 		else:
-			email_return[:50]
+            email_return[:50]
 			self.logger.warning(email_return)
 
 			#Display the mail! It works :D!
-			self.say("It looks like you have at least " + email_return.length() + " emails.")
+            self.say("It looks like you have at least " + email_return.length() + " emails.")
 			view = AddViews(self.refId, dialogPhase="Summary")
 			view1 = AssistantUtteranceView(text="Here is what I found: ", speakableText="Here is what I found: ", dialogIdentifier="EmailFindDucs#foundEmail")
 			snippet = EmailSnippet()
@@ -824,7 +824,7 @@ class shortMessaging(Plugin):
             lst.items.append(item)
         return root
     
-    @register("en-US", "(Write |Send |New )?(message|sms|text)( to| for)? (?P<recipient>[\w ]+?)$")
+    @register("en-US", "(Write |Send |Compose |New )?(a |an )?(message|sms|text)( to| for)? (?P<recipient>[\w ]+?)$")
     @register("de-DE", "(Sende|Schreib.)( eine)?( neue)? (Nachricht|sms) an (?P<recipient>[\w ]+?)$")
     def sendSMS(self, speech, lang, regex):
         recipient = regex.group('recipient')
