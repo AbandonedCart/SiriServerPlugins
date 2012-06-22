@@ -4,8 +4,8 @@
 #
 # This process of enhancing plugins has been performed by Twisted.
 #
-# Unmerged versions of these plugins may function differently or lack some functionality.
-# All original headers and licensing information is labeled by the derived plugin name.
+# Unmerged versions of these plugins may function differently or lack some modification.
+# All original headers and licensing information are labeled by the derived plugin name.
 #
 # SMS Plugin
 # created by Eichhoernchen
@@ -75,7 +75,7 @@ responses = {
 'selectAddress':
     {'de-DE': u"Welche Email Adresse für {0}",
         'en-US': u"Which email adress one for {0}"
-}
+},
 'mustRepeat': 
     {'de-DE': [u"Entschuldigung ich hab dich leider nicht verstanden."],
         'en-US': [u"Sorry, I did not understand, please try again", u"Sorry, I don't know what you want"]
@@ -115,6 +115,14 @@ responses = {
 'clarification':
     {'de-DE': [u"Fortfahren mit senden, abbrechen, anschauen oder ändern."],
         'en-US': [u"To continue, you can Send, Cancel, Review, or Change it."]
+    },
+'haveNewMessages': 
+    {
+        'en-US': [u"You have {0} new message{1}."],
+        },
+'noNewMessages': 
+    {
+        'en-US': [u"You don't have any new messages."],
     }
 }
 
@@ -160,6 +168,16 @@ snippetButtons = {
     }
 }
 
+responseRegex = {
+    
+    "yes": {'en-US': ".*(yes|ya|yeah|yup|please|ok).*"},
+    "no":  {'en-US': ".*(no|nope|negative|negatory).*"},
+    "read": {'en-US': ".*read.*"},
+    "reply": {'en-US': ".*reply.*"},
+    "cancel": {'en-US': ".*(cancel|neither|done).*"},
+    "next": {'en-US': ".*(next|continue).*"}
+}
+
 speakableDemitter={
 'en-US': u", or ",
 'de-DE': u', oder '}
@@ -196,7 +214,7 @@ namesToNumberTypes = {
 
 class mail(Plugin):
     
-    def searchUserByName(self, personToLookup):
+    def searchEmailByName(self, personToLookup):
         search = PersonSearch(self.refId)
         search.scope = PersonSearch.ScopeLocalValue
         search.name = personToLookup
@@ -208,7 +226,7 @@ class mail(Plugin):
             raise StopPluginExecution("Unknown response: {0}".format(answerObj))
         return []
     
-    def getNumberTypeForName(self, name, language):
+    def getAddressTypeForName(self, name, language):
         # q&d
         if name != None:
             if name.lower() in namesToNumberTypes[language]:
@@ -219,7 +237,7 @@ class mail(Plugin):
                         return numberTypesLocalized[key][language]
         return None
     
-    def findPhoneForNumberType(self, person, numberType, language):         
+    def findEmailForAddressType(self, person, numberType, language):         
         # first check if a specific number was already requested
         phoneToCall = None
         if numberType != None:
@@ -254,7 +272,7 @@ class mail(Plugin):
                         item.commands.append(SendCommands(commands=[StartRequest(handsFree=False, utterance=numberTypesLocalized[numberType][language])]))
                         lst.items.append(item)
                     answer = self.getResponseForRequest(rootView)
-                    numberType = self.getNumberTypeForName(answer, language)
+                    numberType = self.getAddressTypeForName(answer, language)
                     if numberType != None:
                         matches = filter(lambda x: x.label == numberType, person.emails)
                         if len(matches) == 1:
@@ -265,7 +283,7 @@ class mail(Plugin):
                         self.say(errorNumberTypes[language])
         return phoneToCall
     
-    def presentPossibleUsers(self, persons, language):
+    def presentPossibleEmails(self, persons, language):
         root = AddViews(self.refId, False, False, "Clarification", [], [])
         root.views.append(AssistantUtteranceView(responses['select'][language], responses['select'][language], "ContactDataResolutionDucs#disambiguateContact", True))
         lst = DisambiguationList([], "OK!", True, "OK!", speakableDemitter[language], ", ", "OK!")
@@ -276,13 +294,13 @@ class mail(Plugin):
             lst.items.append(item)
         return root       
     
-    @register("en-US", "(email)* ([\w ]+) *about* ([\w ]+)")  
+    @register("en-US", "(Write |Send |New )?(email)* ([\w ]+) *about* ([\w ]+)")  
     def mail(self, speech, language, regex):
         personToCall = regex.group(2)
         subject = regex.group(3)
         numberType = ""
-        numberType = self.getNumberTypeForName(numberType, language)
-        persons = self.searchUserByName(personToCall)
+        numberType = self.getAddressTypeForName(numberType, language)
+        persons = self.searchEmailByName(personToCall)
         personToCall = None
         if len(persons) > 0:
             if len(persons) == 1:
@@ -291,7 +309,7 @@ class mail(Plugin):
                 identifierRegex = re.compile("\^phoneCallContactId\^=\^urn:ace:(?P<identifier>.*)")
                 #  multiple users, ask user to select
                 while(personToCall == None):
-                    strUserToCall = self.getResponseForRequest(self.presentPossibleUsers(persons, language))
+                    strUserToCall = self.getResponseForRequest(self.presentPossibleEmails(persons, language))
                     self.logger.debug(strUserToCall)
                     # maybe the user clicked...
                     identifier = identifierRegex.match(strUserToCall)
@@ -307,7 +325,7 @@ class mail(Plugin):
             
             if personToCall != None:
                 personAttribute=PersonAttribute()
-                targetEmailAdress = self.findPhoneForNumberType(personToCall, numberType, language)
+                targetEmailAdress = self.findEmailForAddressType(personToCall, numberType, language)
                 personAttribute.data = targetEmailAdress.emailAddress
                 personAttribute.displayText = personToCall.fullName
                 PersonObject = Person()
@@ -806,7 +824,7 @@ class shortMessaging(Plugin):
             lst.items.append(item)
         return root
     
-    @register("en-US", "(Write|Send).*(message|sms|text)( to| for)? (?P<recipient>[\w ]+?)$")
+    @register("en-US", "(Write |Send |New )?(message|sms|text)( to| for)? (?P<recipient>[\w ]+?)$")
     @register("de-DE", "(Sende|Schreib.)( eine)?( neue)? (Nachricht|sms) an (?P<recipient>[\w ]+?)$")
     def sendSMS(self, speech, lang, regex):
         recipient = regex.group('recipient')
@@ -837,4 +855,72 @@ class shortMessaging(Plugin):
                 self.message(self.findPhoneForNumberType(personToMessage, None, lang), personToMessage, lang)
                 return # complete_request is done there
         self.say(responses['notFound'][lang])                         
+        self.complete_request()
+
+    #methods for message dictation
+    def readMessage(self, context):
+        #get sender from the AlertContext objects for the assistant
+        sender = context.msgSender.displayText
+        #send the a view with the name of the sender
+        summary = "New message from {0}:".format(sender)
+        views = AddViews(self.refId, temporary=False, dialogPhase="Summary", scrollToTop=False, views=[])
+        views.views.append(AssistantUtteranceView(text=summary, speakableText='', dialogIdentifier="FindSms#readThem"))
+        self.sendRequestWithoutAnswer(views)
+        #Send the SayIt command to the phone, so it will speak the contents of the message
+        sayIt = UISayIt(self.refId)
+        sayIt.context = context
+        sayIt.message = "New message from @{obj#sender} @{tts#\x1b\\pause=300\\\x1b\\rate=90\\}@{obj#subject}@{tts#\x1b\\pause=300\\\x1b\\rate=100\\} @{tts#\x1b\\pause=300\\\x1b\\rate=90\\}@{obj#message}@{tts#\x1b\\pause=300\\\x1b\\rate=100\\}"
+        self.send_object(sayIt)
+    
+    def postMessageReadHandler(self, msgContext, language, nextMessage=False):
+        summary = u"You can \u2018Reply\u2019 or \u2018Read it\u2019 again."
+        views = AddViews(self.refId, temporary=False, dialogPhase="Summary", scrollToTop=False, views=[])
+        views.views.append(AssistantUtteranceView(text=summary, speakableText= "@{tts#\x1b\\pause=800\\}You can @{tts#\x1b\\pause=25\\}reply, or read it again.", listenAfterSpeaking=True, dialogIdentifier="FindSms#readingPostActions"))
+        resp = self.getResponseForRequest(views).encode('ascii')
+        read = re.compile(responseRegex['read'][language], re.IGNORECASE)
+        reply = re.compile(responseRegex['reply'][language], re.IGNORECASE)
+        cancel = re.compile(responseRegex['cancel'][language], re.IGNORECASE)
+        cont = re.compile(responseRegex['next'][language], re.IGNORECASE)
+        while (read.match(resp) == None) and (reply.match(resp) == None) and (cancel.match(resp) == None) and (cont.match(resp) == None):
+            self.say("I didn't get that, please try again.")
+            summary = u"You can \u2018Reply\u2019 or \u2018Read it\u2019 again."
+            views = AddViews(self.refId, temporary=False, dialogPhase="Summary", scrollToTop=False, views=[])
+            views.views.append(AssistantUtteranceView(text=summary, speakableText= "@{tts#\x1b\\pause=800\\}You can @{tts#\x1b\\pause=25\\}reply, or read it again.", listenAfterSpeaking=True, dialogIdentifier="FindSms#readingPostActions"))
+            resp = self.getResponseForRequest(views).encode('ascii')
+        if read.match(resp):
+            self.readMessage(msgContext)
+            self.postMessageReadHandler(msgContext, language, nextMessage)
+        elif reply.match(resp):
+            self.message(msgContext.msgSender.object.phones[0], msgContext.msgSender.object, language)                
+        elif cancel.match(resp):
+            return 0;
+        elif nextMessage and cont.match(resp):
+            return 1;
+    
+    @register("en-US", "(Do I have|Check my)( many| any)?( new| current)? messages.*")
+    def checkNewMessages(self, speech, langauge, regex):
+        if (hasattr(self.assistant, 'alerts')):
+            numNewMessages = len(self.assistant.alerts)
+            self.say(random.choice(responses['haveNewMessages'][langauge]).format(numNewMessages, "s" if numNewMessages>1 else ""))
+        else:
+            self.say(random.choice(responses['noNewMessages'][langauge]))
+        self.complete_request()
+    
+    @register("en-US", "Read( me)?( my)?( new| current)? (message|messages)")
+    def readNewMessgages(self, speech, langauge, regex):
+        if hasattr(self.assistant, 'alerts'):
+            for context in self.assistant.alerts:
+                nextMessage = False
+                if len(self.assistant.alerts)>1 and context!=self.assistant.alerts[len(self.assistant.alerts)-1]:
+                    nextMessage = True; #if this isn't the last new message waiting, we pass the postReadHandler this information, so it can allow the user to read next.
+                self.readMessage(context)
+                #Send the alert acknowledge command to the phone, so it will clear the alert flag for the message
+                alertAck = AcknowledgeAlert(self.refId)
+                alertAck.object = context
+                self.send_object(alertAck)
+                #ask the user what they want to do
+                cont = self.postMessageReadHandler(context, langauge, nextMessage)
+                if cont == 0:
+                    self.complete_request();
+                    return; 
         self.complete_request()

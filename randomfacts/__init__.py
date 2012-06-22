@@ -4,14 +4,20 @@
 #
 # This process of enhancing plugins has been performed by Twisted.
 #
-# Unmerged versions of these plugins may function differently or lack some functionality.
-# All original headers and licensing information is labeled by the derived plugin name.
+# Unmerged versions of these plugins may function differently or lack some modification.
+# All original headers and licensing information are labeled by the derived plugin name.
 #
 # Random Facts Plugin
 #
 # Magic 8-ball Plugin
 #
 # Memebase PLugin
+#
+# No license included, courtesy of cytec iamcytec@googlemail.com
+#
+# Horoscope PLugin
+#
+# No license included, courtesy of Erich Budianto (edited by Jimmy Kane)
 #
 
 import os, re, random

@@ -3,8 +3,8 @@
 #
 # This process of enhancing plugins has been performed by Twisted.
 #
-# Unmerged versions of these plugins may function differently or lack some functionality.
-# All original headers and licensing information is labeled by the derived plugin name.
+# Unmerged versions of these plugins may function differently or lack some modification.
+# All original headers and licensing information are labeled by the derived plugin name.
 #
 # Wordnik Plugin
 #
@@ -12,6 +12,8 @@
 #http://developer.wordnik.com/docs/
 #
 # Urban Dictionary Plugin
+#
+# No license included, courtesy of SNXRaven (Jonathon Nickols)
 #
 # Wikipedia Plugin
 #
@@ -73,11 +75,11 @@ class urbandictionary(Plugin):
         "en-US": ["Urban dictionary <something>", "Example: Urban dictionary banana"]
                   }
 
-    @register("en-US", ".*Urban.*dictionary ([\w ]+)")
+    @register("en-US", ".*Urban.*dictionary( for| about)? ([\w ]+)")
     def sn_dictionary(self, speech, language, regMatched):
         if language == 'en-US':
-            match = regMatched.group(1).lower()
-            r = urllib2.urlopen('http://www.urbandictionary.com/iphone/search/define?term='+match.group(1))
+            match = regMatched.group(1).lower().replace(' ','+')
+            r = urllib2.urlopen('http://www.urbandictionary.com/iphone/search/define?term='+match)
             data = json.loads(r.read())
             if ( len(data['list']) > 1 ):
                 data['list'] = data['list'][:1]  # only print 2 results
