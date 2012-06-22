@@ -897,7 +897,7 @@ class shortMessaging(Plugin):
         elif nextMessage and cont.match(resp):
             return 1;
     
-    @register("en-US", "(Do I have|Check my)( many| any)?( new| current)? messages.*")
+    @register("en-US", "(Do I have|Check)( for| many| any)?( new)? messages.*")
     def checkNewMessages(self, speech, langauge, regex):
         if (hasattr(self.assistant, 'alerts')):
             numNewMessages = len(self.assistant.alerts)
@@ -906,7 +906,7 @@ class shortMessaging(Plugin):
             self.say(random.choice(responses['noNewMessages'][langauge]))
         self.complete_request()
     
-    @register("en-US", "Read( me)?( my)?( new| current)? (message|messages)")
+    @register("en-US", "Read( me)?( my)?( new)? (message|messages)")
     def readNewMessgages(self, speech, langauge, regex):
         if hasattr(self.assistant, 'alerts'):
             for context in self.assistant.alerts:
