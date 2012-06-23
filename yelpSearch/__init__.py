@@ -13,18 +13,25 @@
 #
 # Traffic Plugin
 #
+# Created by Javik
+# Edited and made better by Tristen Russ (Playfrog4u)
+#
 
 import re
 import urllib2, urllib
 import json
+import random
  
 from plugin import *
- 
-from siriObjects.systemObjects import GetRequestOrigin, Location
-from siriObjects.uiObjects import AddViews, AssistantUtteranceView
-from siriObjects.localsearchObjects import MapItem, MapItemSnippet
+
+from siriObjects.baseObjects import AceObject, ClientBoundCommand, ObjectIsCommand, RequestCompleted
+from siriObjects.systemObjects import *
+from siriObjects.uiObjects import *
+from siriObjects.localsearchObjects import Business, MapItem, MapItemSnippet, Rating, ShowMapPoints
 
 geonames_user="test2"
+
+yelp_api_key = APIKeyForAPI("yelp")
  
 class whereAmI(Plugin):
     
@@ -66,20 +73,6 @@ class whereAmI(Plugin):
         view.views = [AssistantUtteranceView(speakableText=the_header, dialogIdentifier="Map#whereAmI"), mapsnippet]
         self.sendRequestWithoutAnswer(view)
         self.complete_request()
-
-import re
-import urllib2, urllib
-import json
-import random
-
-from plugin import *
-
-from siriObjects.baseObjects import AceObject, ClientBoundCommand
-from siriObjects.systemObjects import GetRequestOrigin,Location
-from siriObjects.uiObjects import AddViews, AssistantUtteranceView
-from siriObjects.localsearchObjects import Business, MapItem, MapItemSnippet, Rating
-
-yelp_api_key = APIKeyForAPI("yelp")
 
 class yelpSearch(Plugin):
      res = {
@@ -148,17 +141,6 @@ class yelpSearch(Plugin):
                self.say(yelpSearch.res['no-results'][language].format(str(Title)))
           self.complete_request()
 
-import re
-import urllib2, urllib
-import json
-
-from plugin import *
-
-from siriObjects.baseObjects import AceObject, ClientBoundCommand, ObjectIsCommand, RequestCompleted
-from siriObjects.systemObjects import *
-from siriObjects.uiObjects import *
-from siriObjects.localsearchObjects import MapItem, ShowMapPoints
-
 class basicDirections(Plugin):
     @register("en-US", "How do I get to (?P<location>[\w ]+?)$")
     @register("en-GB", "How do I get to (?P<location>[\w ]+?)$")
@@ -211,8 +193,8 @@ class basicDirections(Plugin):
 
 class Traffic(Plugin):
     
-    @register("en-US", ".*traffic like (in|on) (?P<location>[\w ]+?)$")
-    @register("en-GB", ".*traffic like (in|on) (?P<location>[\w ]+?)$")
+    @register("en-US", ".*traffic like (in|around|near) (?P<location>[\w ]+?)$")
+    @register("en-GB", ".*traffic like (in|around|near) (?P<location>[\w ]+?)$")
     def traffic(self, speech, language, regex):
        searchlocation = regex.group('location')
        Title = searchlocation   
