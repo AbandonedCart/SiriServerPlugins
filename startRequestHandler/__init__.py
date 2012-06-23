@@ -15,7 +15,7 @@ from siriObjects.systemObjects import ResultCallback
 from siriObjects.websearchObjects import WebSearch
 
 
-webSearchAnswerText = {"de": u"Das Web nach {0} durchsuchen …", "en": u"Searching the web for {0} …", "fr": u"Searching the web for {0} …", "nl": u"Zoeken op het web voor {0} …"}
+webSearchAnswerText = {"de": u"Das Web nach {0} durchsuchen.", "en": u"Searching the web for {0}.", "fr": u"Searching the web for {0}.", "nl": u"Zoeken op het web voor {0}."}
 webSearchAnswerFailureText = {"de": u"Entschuldigung, Ich, ich kann jetzt nicht das Web durchsuchen.", "en": u"Sorry but I cannot search the web right now.", "fr": u"Sorry but I cannot search the web right now.", "nl": u"Excuses, maar ik kan nu niet het web doorzoeken."}
 class startRequestHandler(Plugin):    
 

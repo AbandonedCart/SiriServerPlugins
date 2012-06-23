@@ -34,6 +34,7 @@ class images(Plugin):
         Query = urllib.quote_plus(Title.encode("utf-8"))
         SearchURL = u'https://ajax.googleapis.com/ajax/services/search/images?v=1.0&safe=off&q=' + str(Query)
         answer = self.ask("Would you like mobile sized images only?")
+        answer = self.ask("Would you like mobile size images only?")
         if ("Yes" or "Yeah" or "Yup") in answer:
             SearchURL = SearchURL + "&imgsz=small|medium|large|xlarge"
         try:
