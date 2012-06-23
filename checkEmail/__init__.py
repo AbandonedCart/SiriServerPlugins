@@ -294,9 +294,9 @@ class mail(Plugin):
             lst.items.append(item)
         return root
 
-    @register("en-US", ".*(email|mail)* ([\w ]+) *about* ([\w ]+)")
+    @register("en-US", "(Write |Send |Compose |New )?(a |an )?(email|mail)( to| for)? (?P<recipient>[\w ]+) *about* ([\w ]+)")
     def mail(self, speech, language, regex):
-        personToCall = regex.group(2)
+        personToCall = regex.group('recipient')
         subject = regex.group(regex.lastindex)
         numberType = ""
         numberType = self.getAddressTypeForName(numberType, language)
@@ -453,11 +453,11 @@ class checkEmail(Plugin):
 			view.views += [AssistantUtteranceView(text="Looks like you don't have any email.", speakableText="Looks like you don't have any email.", dialogIdentifier="EmailFindDucs#foundNoEmail")]
 			self.sendRequestWithoutAnswer(view)
 		else:
-            email_return[:50]
+			email_return[:50]
 			self.logger.warning(email_return)
 
 			#Display the mail! It works :D!
-            self.say("It looks like you have at least " + email_return.length() + " emails.")
+			self.say("It looks like you have at least " + email_return.length() + " emails.")
 			view = AddViews(self.refId, dialogPhase="Summary")
 			view1 = AssistantUtteranceView(text="Here is what I found: ", speakableText="Here is what I found: ", dialogIdentifier="EmailFindDucs#foundEmail")
 			snippet = EmailSnippet()

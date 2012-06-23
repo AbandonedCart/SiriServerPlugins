@@ -32,7 +32,10 @@ class images(Plugin):
     def imagedisplay(self, speech, language, regex):
         Title = regex.group(regex.lastindex)
         Query = urllib.quote_plus(Title.encode("utf-8"))
-        SearchURL = u'https://ajax.googleapis.com/ajax/services/search/images?v=1.0&imgsz=small|medium|large|xlarge&q=' + str(Query)
+        SearchURL = u'https://ajax.googleapis.com/ajax/services/search/images?v=1.0&safe=off&q=' + str(Query)
+        answer = self.ask("Would you like mobile sized images only?")
+        if ("Yes" or "Yeah" or "Yup") in answer:
+            SearchURL = SearchURL + "&imgsz=small|medium|large|xlarge"
         try:
             jsonResponse = urllib2.urlopen(SearchURL).read()
             jsonDecoded = json.JSONDecoder().decode(jsonResponse)
