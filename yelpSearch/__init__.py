@@ -142,8 +142,8 @@ class yelpSearch(Plugin):
           self.complete_request()
 
 class basicDirections(Plugin):
-    @register("en-US", "How do I get to (?P<location>[\w ]+?)$")
-    @register("en-GB", "How do I get to (?P<location>[\w ]+?)$")
+    @register("en-US", ".*(directions|get) to (?P<location>[\w ]+?)$")
+    @register("en-GB", ".*(directions|get) to (?P<location>[\w ]+?)$")
     def directions(self, speech, language, regex):
        searchlocation = regex.group('location')
        Title = searchlocation   
@@ -234,8 +234,8 @@ class Traffic(Plugin):
        AddViews.dialogPhase = "Summary"
        AssistantUtteranceView = UIAssistantUtteranceView()
        AssistantUtteranceView.dialogIdentifier = "LocationSearch#foundLocationForTraffic"
-       AssistantUtteranceView.speakableText = "Here\'s the traffic:"
-       AssistantUtteranceView.text = "Here\'s the traffic:"
+       AssistantUtteranceView.speakableText = "Here\'s the traffic for " + Loc.city +":"
+       AssistantUtteranceView.text = "Here\'s the traffic for " + Loc.city +":"
        AddViews.views = [(AssistantUtteranceView)]
        AddViews.scrollToTop = False
        AddViews.callbacks = [ResultCallback([ShowPoints], code)]
@@ -273,8 +273,8 @@ class Traffic(Plugin):
        AddViews.dialogPhase = "Summary"
        AssistantUtteranceView = UIAssistantUtteranceView()
        AssistantUtteranceView.dialogIdentifier = "LocationSearch#foundLocationForTraffic"
-       AssistantUtteranceView.speakableText = "Here\'s the traffic:"
-       AssistantUtteranceView.text = "Here\'s the traffic:"
+       AssistantUtteranceView.speakableText = "Here\'s the current traffic:"
+       AssistantUtteranceView.text = "Here\'s the current traffic:"
        AddViews.views = [(AssistantUtteranceView)]
        AddViews.scrollToTop = False
        AddViews.callbacks = [ResultCallback([ShowPoints], code)]

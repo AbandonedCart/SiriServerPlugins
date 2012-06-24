@@ -19,6 +19,13 @@
 #
 # Unit Converter Plugin
 #
+# Display Plugin
+#
+#request formatting information can be found at
+#https://developers.google.com/image-search/v1/jsondevguide#request_format
+#
+# Search Plugin
+#
 
 import urllib2, nltk, json
 import json, urllib
@@ -31,7 +38,8 @@ from plugins.defineWordnik.config import *
 
 from siriObjects.baseObjects import AceObject, ClientBoundCommand
 from siriObjects.uiObjects import AddViews, AssistantUtteranceView
-from siriObjects.answerObjects import AnswerSnippet, AnswerObject, AnswerObjectLine 
+from siriObjects.answerObjects import AnswerSnippet, AnswerObject, AnswerObjectLine
+from siriObjects.websearchObjects import WebSearch
 
 #you will need to install the Wordnik API to use this
 #this can be done from the commandline by typing: easy_install Wordnik
@@ -51,7 +59,7 @@ w = Wordnik(api_key=wordnik_api_key)
 
 class defineWordnik(Plugin):
     
-    @register("en-US", "define ([\w ]+)")
+    @register("en-US", ".*define ([\w ]+)")
     def defineword(self, speech, language, regMatched):
         Question = regMatched.group(1).lower()
         output = w.word_get_definitions(Question, limit=1)
@@ -68,6 +76,43 @@ class defineWordnik(Plugin):
 
         self.complete_request()
 
+class images(Plugin):
+    
+    @register("de-DE", "(zeig mir|zeige|zeig).*(bild|zeichnung) (vo. ein..|vo.|aus)* ([\w ]+)")
+    @register("en-US", "(display|show me|show).*(picture|image|drawing|illustration) (of|an|a)* ([\w ]+)")
+    def imagedisplay(self, speech, language, regex):
+        Title = regex.group(regex.lastindex)
+        Query = urllib.quote_plus(Title.encode("utf-8"))
+        SearchURL = u'https://ajax.googleapis.com/ajax/services/search/images?v=1.0&safe=off&q=' + str(Query)
+        answer = self.ask("Would you like mobile size images only?")
+        if ("Yes" or "Yeah" or "Yup") in answer:
+            SearchURL = SearchURL + "&imgsz=small|medium|large|xlarge"
+        try:
+            jsonResponse = urllib2.urlopen(SearchURL).read()
+            jsonDecoded = json.JSONDecoder().decode(jsonResponse)
+            ImageURL = jsonDecoded['responseData']['results'][0]['unescapedUrl']
+            view = AddViews(self.refId, dialogPhase="Completion")
+            ImageAnswer = AnswerObject(title=str(Title),lines=[AnswerObjectLine(image=ImageURL)])
+            view1 = AnswerSnippet(answers=[ImageAnswer])
+            view.views = [view1]
+            self.sendRequestWithoutAnswer(view)
+            self.complete_request()
+        except (urllib2.URLError):
+            self.say("Sorry, a connection to Google Images could not be established.")
+            self.complete_request()
+    @register("en-US", ".*(Search|Google)( the)?( web| net| internet| google)?( for| about)? ([\w ]+)")
+    def webSearch(self, speech, language, regex):
+        if (language == "en-US"):
+            speech = regex.group(regex.lastindex).lower()
+            terms = urllib.quote_plus(speech.encode("utf-8"))
+            if terms == "":
+                speech = self.ask("What is your query?")
+                terms = urllib.quote_plus(speech.encode("utf-8"))
+
+        search = WebSearch(refId=self.refId, query=terms)
+        self.sendRequestWithoutAnswer(search)
+        self.complete_request()
+
 class urbandictionary(Plugin):
 
     # Dictionary for help phrases used by the helpPlugin
@@ -75,7 +120,7 @@ class urbandictionary(Plugin):
         "en-US": ["Urban dictionary <something>", "Example: Urban dictionary banana"]
                   }
 
-    @register("en-US", ".*Urban.*dictionary( for| about)? ([\w ]+)")
+    @register("en-US", ".*urban dictionary ([\w ]+)")
     def sn_dictionary(self, speech, language, regMatched):
         if language == 'en-US':
             match = regMatched.group(1).lower().replace(' ','+')
