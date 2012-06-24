@@ -28,8 +28,7 @@ class startRequestHandler(Plugin):
     @register("fr-FR", u"\^webSearchQuery\^=\^(.+)\^\^webSearchConfirmation\^=\^(.+)\^")
     @register("nl-NL", u"\^webSearchQuery\^=\^(.+)\^\^webSearchConfirmation\^=\^(.+)\^")
     def webSearchConfirmation(self, speech, language, regMatched):
-        searchTerms = regMatched.group(1)
-        webSearchQuery = urllib.quote_plus(searchTerms.encode("utf-8"))
+        webSearchQuery = regMatched.group(1)
         #webSearchConfirmation = regMatched.group(2)
         
         lang = language.split("-")[0]
@@ -37,8 +36,8 @@ class startRequestHandler(Plugin):
         resultCallback1View = UIAddViews(refId="")
         resultCallback1ViewView = UIAssistantUtteranceView()
         resultCallback1ViewView.dialogIdentifier="WebSearch#initiateWebSearch"
-        resultCallback1ViewView.text=webSearchAnswerText[lang].format(u"\"{0}“".format(webSearchQuery)).replace('+',' ')
-        resultCallback1ViewView.speakableText=webSearchAnswerText[lang].format(webSearchQuery).replace('+',' ')
+        resultCallback1ViewView.text=webSearchAnswerText[lang].format(u"\"{0}“".format(webSearchQuery))
+        resultCallback1ViewView.speakableText=webSearchAnswerText[lang].format(webSearchQuery)
         resultCallback1View.views = [resultCallback1ViewView]
         
         search = WebSearch(refId="", aceId="", query=webSearchQuery)

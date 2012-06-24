@@ -104,12 +104,10 @@ class images(Plugin):
     def webSearch(self, speech, language, regex):
         if (language == "en-US"):
             speech = regex.group(regex.lastindex).lower()
-            terms = urllib.quote_plus(speech.encode("utf-8"))
-            if terms == "":
+            if speech == "":
                 speech = self.ask("What is your query?")
-                terms = urllib.quote_plus(speech.encode("utf-8"))
 
-        search = WebSearch(refId=self.refId, query=terms)
+        search = WebSearch(refId=self.refId, query=speech)
         self.sendRequestWithoutAnswer(search)
         self.complete_request()
 
@@ -123,7 +121,8 @@ class urbandictionary(Plugin):
     @register("en-US", ".*urban dictionary ([\w ]+)")
     def sn_dictionary(self, speech, language, regMatched):
         if language == 'en-US':
-            match = regMatched.group(1).lower().replace(' ','+')
+            terms = regMatched.group(1).lower()
+            match = urllib.quote_plus(terms.encode("utf-8"))
             r = urllib2.urlopen('http://www.urbandictionary.com/iphone/search/define?term='+match)
             data = json.loads(r.read())
             if ( len(data['list']) > 1 ):
