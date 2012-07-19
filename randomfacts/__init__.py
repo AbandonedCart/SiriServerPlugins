@@ -461,13 +461,13 @@ class smallTalk(Plugin):
                 generate = bool (random.getrandbits(1))
                 if generate:
                     self.say("{0}, I know where ".format(self.user_name()) + city + ", " + stateLong + " is located!")
-                    self.say("You should think twice before you say " + speech.lower() + " to someone like me.")
+                    self.say("You should think twice before you say \"" + speech.lower() + "\" to someone like me.")
                 else:
-                    answer = self.ask("Does everyone in " + city + " use words like " + speech.lower() + " around a lady, {0}".format(self.user_name()))
-                    if ("Yes" or "Yeah" or "Yup") in answer:
-                        self.say("It seems " + stateLong + " is just crowded with losers...")
-                    else:
+                    answer = self.ask("Does everyone in " + city + " say things like \"" + speech.lower() + "\" around a lady, {0}?".format(self.user_name()))
+                    if ("No" or "Nah" or "Nope") in answer:
                         self.say("Then stop ruining  " + stateLong + "'s good reputation!")
+                    else:
+                        self.say("It seems " + stateLong + " is just crowded with losers...")
         self.complete_request()
     
     @register("en-US",".*talk.*dirty.*me.*")
