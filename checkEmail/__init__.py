@@ -38,9 +38,9 @@
 
 import re
 import logging
-import time
 import pytz
 import datetime
+import time
 import random
 
 from datetime import *
@@ -372,7 +372,7 @@ class mail(Plugin):
                 UpdateDomainIdentifier = EmailEmail()
                 UpdateDomainIdentifier.identifier = DomainIdentifier
                 DomainUpdate.identifier = UpdateDomainIdentifier
-                time.sleep(2)
+                #time.sleep(2)
                 print "Sending update request ..."
                 DomainUpdateAnswer = self.getResponseForRequest(DomainUpdate)
                 
@@ -391,7 +391,7 @@ class mail(Plugin):
                 else:
                     raise StopPluginExecution("Unknown response: {0}".format(answer))		
                 
-                FinallAsk = AssistantUtteranceView("Ready to send ?", "Ready to send ?", listenAfterSpeaking=True)
+                FinallAsk = AssistantUtteranceView("Ready to send?", "Ready to send?", listenAfterSpeaking=True)
                 
                 FinallEmail = EmailEmail()
                 FinallEmail.identifier = DomainIdentifier
@@ -416,11 +416,11 @@ class mail(Plugin):
                     print "Received answer !"
                     if ObjectIsCommand(CommitAnswer, DomainObjectCommitCompleted):
                         print "Received DomainObjectCommitCompleted !"      
-                        self.say("I sent it !")
+                        self.say("I have sent your email!")
                     else:
                         raise StopPluginExecution("Unknown response: {0}".format(answer))
                 else:
-                    self.say("OK, I'll forget it !")		
+                    self.say("I have discarded your email!")		
                 self.complete_request()                
         
         self.say(responses['notFound'][language])                         
@@ -922,5 +922,7 @@ class shortMessaging(Plugin):
                 cont = self.postMessageReadHandler(context, langauge, nextMessage)
                 if cont == 0:
                     self.complete_request();
-                    return; 
+                    return;
+        else:
+            self.say(random.choice(responses['noNewMessages'][langauge]))
         self.complete_request()
