@@ -1,84 +1,28 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-
-#
-# This process of enhancing plugins has been performed by Twisted.
-#
-# Unmerged versions of these plugins may function differently or lack some modification.
-# All original headers and licensing information are labeled by the derived plugin name.
-#
-# WhereAmI Plugin
-#
-# Yelp Plugin
-#
-# Traffic Plugin
-#
-# Created by Javik
-# Edited and made better by Tristen Russ (Playfrog4u)
-#
+# by Alex 'apexad' Martin
+# help from: muhkuh0815 & gaVRos
+# multilanguage support by cytec
 
 import re
 import urllib2, urllib
 import json
 import random
- 
+
 from plugin import *
 
-from siriObjects.baseObjects import AceObject, ClientBoundCommand, ObjectIsCommand, RequestCompleted
-from siriObjects.systemObjects import *
-from siriObjects.uiObjects import *
-from siriObjects.localsearchObjects import Business, MapItem, MapItemSnippet, Rating, ShowMapPoints
-
-geonames_user="test2"
+from siriObjects.baseObjects import AceObject, ClientBoundCommand
+from siriObjects.systemObjects import GetRequestOrigin,Location
+from siriObjects.uiObjects import AddViews, AssistantUtteranceView
+from siriObjects.localsearchObjects import Business, MapItem, MapItemSnippet, Rating
 
 yelp_api_key = APIKeyForAPI("yelp")
- 
-class whereAmI(Plugin):
-    
-    @register("de-DE", "(Wo bin ich.*)")
-    @register("fr-FR", u'(Où suis-je.*)')    
-    @register("en-US", "(Where am I.*)|(What is my location.*)")
-    def whereAmI(self, speech, language):
-        location = self.getCurrentLocation(force_reload=True,accuracy=GetRequestOrigin.desiredAccuracyBest)
-        url = "http://maps.googleapis.com/maps/api/geocode/json?latlng={0},{1}&sensor=false&language={2}".format(str(location.latitude),str(location.longitude), language)
-        try:
-            jsonString = urllib2.urlopen(url, timeout=3).read()
-        except:
-            pass
-        if jsonString != None:
-            response = json.loads(jsonString)
-            if response['status'] == 'OK':
-                components = response['results'][0]['address_components']              
-                street = filter(lambda x: True if "route" in x['types'] else False, components)[0]['long_name']
-                stateLong= filter(lambda x: True if "administrative_area_level_1" in x['types'] or "country" in x['types'] else False, components)[0]['long_name']
-                try:
-                    postalCode= filter(lambda x: True if "postal_code" in x['types'] else False, components)[0]['long_name']
-                except:
-                    postalCode=""
-                try:
-                    city = filter(lambda x: True if "locality" in x['types'] or "administrative_area_level_1" in x['types'] else False, components)[0]['long_name']
-                except:
-                    city=""
-                countryCode = filter(lambda x: True if "country" in x['types'] else False, components)[0]['short_name']
-                view = AddViews(self.refId, dialogPhase="Completion")
-                if language == "de-DE":
-                    the_header="Dein Standort"
-                elif language == 'fr-FR':
-                    the_header="Votre position"
-                else:
-                    self.say("This is your location {0}".format(self.user_name()))
-                    the_header="Your location"
-        view = AddViews(self.refId, dialogPhase="Completion")
-        mapsnippet = MapItemSnippet(items=[MapItem(label=postalCode+" "+city, street=street, city=city, postalCode=postalCode, latitude=location.latitude, longitude=location.longitude, detailType="CURRENT_LOCATION")])
-        view.views = [AssistantUtteranceView(speakableText=the_header, dialogIdentifier="Map#whereAmI"), mapsnippet]
-        self.sendRequestWithoutAnswer(view)
-        self.complete_request()
 
 class yelpSearch(Plugin):
      res = {
           'searchString': {
-               'en-US': '(find|show|where)?.*( )?(nearest|nearby|closest) (.*)',
-               'en-GB': '(find|show|where).* (nearest|nearby|closest) (.*)',
+               'en-US': '(find|show|where|locate).* (nearest|nearby|closest) (.*)',
+               'en-GB': '(find|show|where|locate).* (nearest|nearby|closest) (.*)',
                'de-DE': '(finde|zeige|wo).* (n\xe4chste|nächstes|n\xe4chstes|nahe|in der n\xe4he|in der umgebung) (.*)'
           },
           'searching': {
@@ -140,143 +84,3 @@ class yelpSearch(Plugin):
           else:
                self.say(yelpSearch.res['no-results'][language].format(str(Title)))
           self.complete_request()
-
-class basicDirections(Plugin):
-    @register("en-US", ".*(directions|get) to (?P<location>[\w ]+?)$")
-    @register("en-GB", ".*(directions|get) to (?P<location>[\w ]+?)$")
-    def directions(self, speech, language, regex):
-       searchlocation = regex.group('location')
-       Title = searchlocation   
-       Query = urllib.quote_plus(str(Title.encode("utf-8")))
-       googleurl = "http://maps.googleapis.com/maps/api/geocode/json?address={0}&sensor=true&language=en".format(Query)
-       jsonString = urllib2.urlopen(googleurl, timeout=20).read()
-       response = json.loads(jsonString)
-       if (response['status'] == 'OK') and (len(response['results'])):
-         for result in response['results']:
-             label = "{0}".format(Title.title())
-             latitude=result['geometry']['location']['lat']
-             longitude=result['geometry']['location']['lng']
-             city=result['address_components'][0]['long_name']
-             state=result['address_components'][2]['short_name']
-             country=result['address_components'][3]['short_name']
-       code = 0
-       Loc = Location(self.refId)
-       Loc.street = ""
-       Loc.countryCode = country
-       Loc.city = city
-       Loc.latitude = latitude
-       Loc.stateCode = state
-       Loc.longitude = longitude
-       Map = MapItem(self.refId)
-       Map.detailType = "ADDRESS_ITEM"
-       Map.label = label
-       Map.location = Loc
-       Source = MapItem(self.refId)
-       Source.detailType = "CURRENT_LOCATION"
-       ShowPoints = ShowMapPoints(self.refId)
-       ShowPoints.showTraffic = False  
-       ShowPoints.showDirections = True
-       ShowPoints.regionOfInterestRadiusInMiles = "10.0"
-       ShowPoints.itemDestination = Map
-       ShowPoints.itemSource = Source
-       AddViews = UIAddViews(self.refId)
-       AddViews.dialogPhase = "Summary"
-       AssistantUtteranceView = UIAssistantUtteranceView()
-       AssistantUtteranceView.dialogIdentifier = "LocationSearch#foundLocationForDirections"
-       AssistantUtteranceView.speakableText = "Here are directions to {0}:".format(label)
-       AssistantUtteranceView.text = "Here are directions to {0}:".format(label)
-       AddViews.views = [(AssistantUtteranceView)]
-       AddViews.scrollToTop = False
-       AddViews.callbacks = [ResultCallback([ShowPoints], code)]
-       callback = [ResultCallback([AddViews])]
-       self.complete_request(callbacks=[ResultCallback([AddViews], code)])
-
-class Traffic(Plugin):
-    
-    @register("en-US", ".*traffic like (in|around|near) (?P<location>[\w ]+?)$")
-    @register("en-GB", ".*traffic like (in|around|near) (?P<location>[\w ]+?)$")
-    def traffic(self, speech, language, regex):
-       searchlocation = regex.group('location')
-       Title = searchlocation   
-       Query = urllib.quote_plus(str(Title.encode("utf-8")))
-       googleurl = "http://maps.googleapis.com/maps/api/geocode/json?address={0}&sensor=true&language=en".format(Query)
-       jsonString = urllib2.urlopen(googleurl, timeout=20).read()
-       response = json.loads(jsonString)
-       if (response['status'] == 'OK') and (len(response['results'])):
-         for result in response['results']:
-             label = "{0}".format(Title.title())
-             latitude=result['geometry']['location']['lat']
-             longitude=result['geometry']['location']['lng']
-             city=result['address_components'][0]['long_name']
-             state=result['address_components'][2]['short_name']
-             country=result['address_components'][3]['short_name']
-       code = 0
-       Loc = Location(self.refId)
-       Loc.street = ""
-       Loc.countryCode = country
-       Loc.city = city
-       Loc.latitude = latitude
-       Loc.stateCode = state
-       Loc.longitude = longitude
-       Map = MapItem(self.refId)
-       Map.detailType = "ADDRESS_ITEM"
-       Map.label = label
-       Map.location = Loc
-       Source = MapItem(self.refId)
-       Source.detailType = "CURRENT_LOCATION"
-       ShowPoints = ShowMapPoints(self.refId)
-       ShowPoints.showTraffic = True  
-       ShowPoints.showDirections = False
-       ShowPoints.regionOfInterestRadiusInMiles = "10.0"
-       ShowPoints.itemDestination = Map
-       ShowPoints.itemSource = Source
-       AddViews = UIAddViews(self.refId)
-       AddViews.dialogPhase = "Summary"
-       AssistantUtteranceView = UIAssistantUtteranceView()
-       AssistantUtteranceView.dialogIdentifier = "LocationSearch#foundLocationForTraffic"
-       AssistantUtteranceView.speakableText = "Here\'s the traffic for " + Loc.city +":"
-       AssistantUtteranceView.text = "Here\'s the traffic for " + Loc.city +":"
-       AddViews.views = [(AssistantUtteranceView)]
-       AddViews.scrollToTop = False
-       AddViews.callbacks = [ResultCallback([ShowPoints], code)]
-       callback = [ResultCallback([AddViews])]
-       self.complete_request(callbacks=[ResultCallback([AddViews], code)])
-
-    @register("en-US", ".*traffic like")
-    @register("en-GB", ".*traffic like")
-    def trafficSelf(self, speech, language, regex):
-       mapGetLocation = self.getCurrentLocation(force_reload=True,accuracy=GetRequestOrigin.desiredAccuracyBest)
-       latitude= mapGetLocation.latitude
-       longitude= mapGetLocation.longitude
-       label = "Your location"
-       code = 0
-       Loc = Location(self.refId)
-       Loc.street = ""
-       Loc.countryCode = "US"
-       Loc.city = ""
-       Loc.latitude = latitude
-       Loc.stateCode = ""
-       Loc.longitude = longitude
-       Map = MapItem(self.refId)
-       Map.detailType = "ADDRESS_ITEM"
-       Map.label = label
-       Map.location = Loc
-       Source = MapItem(self.refId)
-       Source.detailType = "CURRENT_LOCATION"
-       ShowPoints = ShowMapPoints(self.refId)
-       ShowPoints.showTraffic = True  
-       ShowPoints.showDirections = False
-       ShowPoints.regionOfInterestRadiusInMiles = "10.0"
-       ShowPoints.itemDestination = Map
-       ShowPoints.itemSource = Source
-       AddViews = UIAddViews(self.refId)
-       AddViews.dialogPhase = "Summary"
-       AssistantUtteranceView = UIAssistantUtteranceView()
-       AssistantUtteranceView.dialogIdentifier = "LocationSearch#foundLocationForTraffic"
-       AssistantUtteranceView.speakableText = "Here\'s the current traffic:"
-       AssistantUtteranceView.text = "Here\'s the current traffic:"
-       AddViews.views = [(AssistantUtteranceView)]
-       AddViews.scrollToTop = False
-       AddViews.callbacks = [ResultCallback([ShowPoints], code)]
-       callback = [ResultCallback([AddViews])]
-       self.complete_request(callbacks=[ResultCallback([AddViews], code)])
