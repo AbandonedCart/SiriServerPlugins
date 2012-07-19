@@ -7,7 +7,7 @@
 # Unmerged versions of these plugins may function differently or lack some modification.
 # All original headers and licensing information are labeled by the derived plugin name.
 #
-# Weather Plugin  
+# Weather / Time Plugin  
 # created by Eichhoernchen
 #
 # It uses various the services from yahoo
@@ -27,7 +27,29 @@
 #
 # This file can be freely modified, but this header must retain untouched
 #
+# Combo Enhancement
+# integrated by Twisted
+#
+# Places the weather and time into a single view, with
+# extra introduction speech to inlude temperature info
+#
 
+import random
+import urllib
+import urllib2
+import json
+import random
+import types
+import os
+import locale
+import re
+import time, datetime
+import urllib2, urllib
+import logging
+from time import gmtime, strftime
+from uuid import uuid4
+from plugin import *
+from fractions import Fraction
 from datetime import date
 from plugin import *
 from siriObjects.weatherObjects import WeatherHourlyForecast, \
@@ -35,10 +57,32 @@ from siriObjects.weatherObjects import WeatherHourlyForecast, \
     WeatherBarometricPressure, WeatherWindSpeed, WeatherDailyForecast, \
     WeatherForecast, WeatherObject, WeatherLocation, WeatherForecastSnippet
 from xml.etree import ElementTree
-import random
-import urllib
-import urllib2
+from siriObjects.clockObjects import ClockSnippet, ClockObject
+from siriObjects.baseObjects import AceObject, ClientBoundCommand
+from siriObjects.uiObjects import AddViews, AssistantUtteranceView
 
+localizations = {
+    "search":
+    {
+      "de-DE": [u"Es wird gesucht ..."], 
+      "en-US": [u"Looking up ..."]
+    },                  
+    "currentTime": 
+    {
+     "de-DE": [u"Es ist @{fn#currentTime}"], 
+     "en-US": [u"It is currently @{fn#currentTime}"]
+    }, 
+    "currentTimeIn": 
+    {
+      "de-DE": [u"Die Uhrzeit in {0} ist @{{fn#currentTimeIn#{1}}}:"], 
+      "en-US": [u"The time in {0} is @{{fn#currentTimeIn#{1}}}:"]
+    },
+    "failure":
+    {
+      "de-DE": [u"Es tut mir leid aber für eine Anfrage habe ich keine Uhrzeit."],
+      "en-US": [u"I'm sorry but I don't have a time for this request"]
+    }
+}
 
 appleWeek = {
 'Sun': 1,
@@ -308,8 +352,8 @@ noDataForLocationText = {
 }
 
 dailyForcast = {
-    'de-DE': [u"Hier ist die Vorhersage für {0}, {1}"],
-    'en-US': [u"This is the forecast for {0}, {1}"]
+    'de-DE': [u"Hier ist die Vorhersage für {0}, {1}."],
+    'en-US': [u"Here is the visual forecast for {0}, {1}."]
 }
 
 yweather = "{http://xml.weather.yahoo.com/ns/rss/1.0}"
@@ -319,6 +363,142 @@ place = "{http://where.yahooapis.com/v1/schema.rng}"
 idFinder = re.compile("/(?P<locationID>[A-z0-9_]+).html")
 
 class yahooWeather(Plugin):
+
+    def showWait(self, language):
+        textView = UIAssistantUtteranceView()
+        textView.speakableText = textView.text = random.choice(localizations['search'][language])
+        textView.dialogIdentifier = "Clock#getTime"
+
+        rootAnchor = UIAddViews(self.refId)
+        rootAnchor.dialogPhase = rootAnchor.DialogPhaseReflectionValue
+        rootAnchor.scrollToTop = False
+        rootAnchor.temporary = False
+        rootAnchor.views = [textView]  
+        
+        self.sendRequestWithoutAnswer(rootAnchor)
+
+    @register("de-DE", "(Wie ?viel Uhr.*)|(.*Uhrzeit.*)")     
+    @register("en-US", "(What.*time.*)|(.*current time.*)")
+    def currentTime(self, speech, language):
+        #first tell that we look it up
+        self.showWait(language)
+        
+        
+        textView = UIAssistantUtteranceView()
+        textView.text = textView.speakableText = random.choice(localizations["currentTime"][language]) + "."
+        textView.dialogIdentifier = "Clock#showTimeInCurrentLocation"
+        textView.listenAfterSpeaking = False
+        
+        clock = ClockObject()
+        clock.timezoneId = self.connection.assistant.timeZoneId
+        
+        clockView = ClockSnippet()
+        clockView.clocks = [clock]
+        
+        rootAnchor = UIAddViews(self.refId)
+        rootAnchor.dialogPhase = rootAnchor.DialogPhaseSummaryValue
+        rootAnchor.views = [textView, clockView]
+        
+        
+        self.sendRequestWithoutAnswer(rootAnchor)
+        self.complete_request()
+
+    def getNameFromGoogle(request):
+        try:
+            result = getWebsite(request, timeout=5)
+            root = json.loads(result)
+            location = root["results"][0]["formatted_address"]
+            return location
+        except:
+            return None
+    
+    @register("de-DE", "(Wieviel Uhr.*in|Uhrzeit.*in) (?P<loc>[\w ]+)")
+    @register("en-US", "(What.*time.*|.*current time.*)(in|for) (?P<loc>[\w ]+)")
+    def currentTimeIn(self, speech, language, matchedRegex):
+        
+        self.showWait(language)
+        
+        location = matchedRegex.group("loc")
+        # ask google to enhance the request
+        googleGuesser = "http://maps.googleapis.com/maps/api/geocode/json?address={0}&sensor=false&language={1}".format(urllib.quote(location.encode("utf-8")), language)
+        googleLocation = getNameFromGoogle(googleGuesser)
+        if googleLocation != None:
+            location = googleLocation
+        
+        self.logger.debug(u"User requested time in: {0}".format(location))
+        # ask yahoo for a timezoneID
+        query = u"select name from geo.places.belongtos where member_woeid in (select woeid from geo.places where text=\"{0}\") and placetype=31".format(location.encode("utf-8"))
+        request = u"http://query.yahooapis.com/v1/public/yql?q={0}&format=json&callback=".format(urllib.quote(query.encode("utf-8")))
+        timeZoneId = None
+        try:
+            result = getWebsite(request, timeout=5)
+            root = json.loads(result)
+            place = root["query"]["results"]["place"]
+            if type(place) == types.ListType:
+                place = place[0]
+            
+            timeZoneId = place["name"]
+        except:
+            self.logger.exception("Error getting timezone")
+        
+        if timeZoneId == None:
+            self.say(random.choice(localizations['failure'][language]))
+            self.complete_request()
+            return
+        
+        clock = ClockObject()
+        clock.timezoneId = timeZoneId
+        
+        clockView = ClockSnippet()
+        clockView.clocks = [clock]
+        
+        textView = UIAssistantUtteranceView()
+        textView.listenAfterSpeaking = False
+        textView.dialogIdentifier = "Clock#showTimeInOtherLocation"
+        textView.text = textView.speakableText = random.choice(localizations["currentTimeIn"][language]).format(location, timeZoneId) + "."
+        
+        rootAnchor = UIAddViews(self.refId)
+        rootAnchor.dialogPhase = rootAnchor.DialogPhaseSummaryValue
+        rootAnchor.scrollToTop = False
+        rootAnchor.temporary = False
+        rootAnchor.views = [textView, clockView]
+        
+        self.sendRequestWithoutAnswer(rootAnchor)
+        self.complete_request()
+
+## we should implement such a command if we cannot get the location however some structures are not implemented yet
+#{"class"=>"AddViews",
+#    "properties"=>
+#        {"temporary"=>false,
+#            "dialogPhase"=>"Summary",
+#            "scrollToTop"=>false,
+#            "views"=>
+#                [{"class"=>"AssistantUtteranceView",
+#                 "properties"=>
+#                 {"dialogIdentifier"=>"Common#unresolvedExplicitLocation",
+#                 "speakableText"=>
+#                 "Ich weiß leider nicht, wo das ist. Wenn du möchtest, kann ich im Internet danach suchen.",
+#                 "text"=>
+#                 "Ich weiß leider nicht, wo das ist. Wenn du möchtest, kann ich im Internet danach suchen."},
+#                 "group"=>"com.apple.ace.assistant"},
+#                 {"class"=>"Button",
+#                 "properties"=>
+#                 {"commands"=>
+#                 [{"class"=>"SendCommands",
+#                  "properties"=>
+#                  {"commands"=>
+#                  [{"class"=>"StartRequest",
+#                   "properties"=>
+#                   {"handsFree"=>false,
+#                   "utterance"=>
+#                   "^webSearchQuery^=^Amerika^^webSearchConfirmation^=^Ja^"},
+#                   "group"=>"com.apple.ace.system"}]},
+#                  "group"=>"com.apple.ace.system"}],
+#                 "text"=>"Websuche"},
+#                 "group"=>"com.apple.ace.assistant"}]},
+#    "aceId"=>"fbec8e13-5781-4b27-8c36-e43ec922dda3",
+#    "refId"=>"702C0671-DB6F-4914-AACD-30E84F7F7DF3",
+#    "group"=>"com.apple.ace.assistant"}
     
     def __init__(self):
         super(yahooWeather, self).__init__()
@@ -494,7 +674,7 @@ class yahooWeather(Plugin):
         if match != None:
             loc = match.group('locationID')
             weatherLocation = self.getWeatherLocation(loc[:-2], result)
-            fiveDayForecast = "http://xml.weather.yahoo.com/forecastrss/{0}.xml".format(loc)
+            fiveDayForecast = "http://xml.weather.yahoo.com/forecastrss/{0}_{1}.xml".format(loc, "c" if metric else "f")
             
             
             try:
@@ -546,8 +726,10 @@ class yahooWeather(Plugin):
         showViewsCMD.dialogPhase = showViewsCMD.DialogPhaseSummaryValue
         displaySnippetTalk = UIAssistantUtteranceView()
         displaySnippetTalk.dialogIdentifier = "Weather#forecastCommentary"
+        
         countryName = countries[forecast.weatherLocation.countryCode.lower()] if forecast.weatherLocation.countryCode.lower() in countries else forecast.weatherLocation.countryCode
         displaySnippetTalk.text = displaySnippetTalk.speakableText = random.choice(dailyForcast[language]).format(forecast.weatherLocation.city, countryName)
+        self.say("It is currently {0} degrees {1} with a humidity of {2}%.".format(forecast.currentConditions.temperature, forecast.units.temperatureUnits, forecast.currentConditions.percentHumidity))
         
         showViewsCMD.views = [displaySnippetTalk, snippet]
         
@@ -564,7 +746,7 @@ class yahooWeather(Plugin):
         except:
             return None
     
-    @register("en-US", "(what( is|'s) the )?weather( like)? in (?P<location>[\w ]+?)$")
+    @register("en-US", "(what|how).*weather.*(in|around|near|for|at) (?P<location>[\w ]+?)$")
     @register('de-DE', "(wie ist das )?wetter in (?P<location>[\w ]+?)$")
     def forcastWeatherAtLocation(self, speech, language, regex):
         self.showWaitPlease(language)
@@ -611,7 +793,7 @@ class yahooWeather(Plugin):
         
         self.showCurrentWeatherWithWOEID(language, woeidElem.text)
         
-    @register("en-US", "(what( is|'s) the )?(weather|forecast)( like| for)?( outside)?( today| now)?")
+    @register("en-US", "(what|how).*(weather|forecast).*")
     @register("de-DE", "wetter(vorhersage)?")
     def forcastWeatherAtCurrentLocation(self, speech, language):
         location = self.getCurrentLocation()
@@ -632,15 +814,175 @@ class yahooWeather(Plugin):
         
         root = ElementTree.XML(result)
         woeidElem = root.find("results/{0}place/{0}woeid".format(place))
-        
-        
+    
         
         if woeidElem is None:
             self.say(random.choice(noDataForLocationText[language]))
             self.complete_request()
             return
         
-        
         self.showCurrentWeatherWithWOEID(language, woeidElem.text)
+
+    def showCurrentWeatherWithTime(self, language, woeid, metric = True):
+        # we can only get 2 day weather with woeid that suxx
+        weatherLookup = "http://weather.yahooapis.com/forecastrss?w={0}&u={1}".format(woeid, "c" if metric else "f")
+        result = getWebsite(weatherLookup, timeout=5)
+        if result == None:
+            self.say(random.choice(errorText[language]))
+            self.complete_request()
+            return
         
+        result = ElementTree.XML(result)
         
+        #get the item
+        item = result.find("channel/item")
+        if item is None:
+            self.say(random.choice(noDataForLocationText[language]))
+            self.complete_request()
+            return
+        
+        # they change the language code using the other forecast link..
+        weatherLocation = None
+        
+        match = idFinder.search(item.find("link").text)
+        if match != None:
+            loc = match.group('locationID')
+            weatherLocation = self.getWeatherLocation(loc[:-2], result)
+            fiveDayForecast = "http://xml.weather.yahoo.com/forecastrss/{0}_{1}.xml".format(loc, "c" if metric else "f")
+            
+            try:
+                result = self.getWebsite(fiveDayForecast, timeout=5)
+                result = ElementTree.XML(result)
+                item = result.find("channel/item")
+            except:
+                pass
+        
+        if weatherLocation == None:
+            weatherLocation = self.getWeatherLocation(woeid, result)
+        
+        if item is None:
+            self.say(random.choice(noDataForLocationText[language]))
+            self.complete_request()
+            return
+        
+        forecast = WeatherObject()
+        forecast.currentConditions = self.getWeatherCurrentConditions(result)
+        if forecast.currentConditions == None:
+            self.say(random.choice(noDataForLocationText[language]))
+            self.complete_request()
+            return
+        
+        forecast.extendedForecastUrl = item.find("link").text
+        forecast.units = self.getWeatherUnits(result)
+        forecast.view = forecast.ViewDAILYValue
+        forecast.weatherLocation = weatherLocation
+        forecast.hourlyForecasts = []
+        
+        dailyForecasts = []
+        for dailyForecast in result.findall("channel/item/{0}forecast".format(yweather)):
+            weatherDaily = WeatherDailyForecast()
+            weatherDaily.timeIndex = appleWeek[dailyForecast.get("day")]
+            weatherDaily.lowTemperature = int(dailyForecast.get("low"))
+            weatherDaily.highTemperature = int(dailyForecast.get("high"))
+            weatherDaily.isUserRequested = True
+            dailyCondition = WeatherCondition()
+            dailyCondition.conditionCodeIndex = int(dailyForecast.get("code"))
+            dailyCondition.conditionCode = dailyCondition.ConditionCodeIndexTable[dailyCondition.conditionCodeIndex]
+            weatherDaily.condition = dailyCondition
+            dailyForecasts.append(weatherDaily)
+    
+        forecast.dailyForecasts = dailyForecasts
+        
+        countryName = countries[forecast.weatherLocation.countryCode.lower()] if forecast.weatherLocation.countryCode.lower() in countries else forecast.weatherLocation.countryCode
+
+        suggestion = ""
+        if "fahrenheit" in forecast.units.temperatureUnits.lower():
+            if (int(forecast.currentConditions.temperature) <= 33.8):
+                suggestion += "freezing"
+            elif (int(forecast.currentConditions.temperature) > 33.8 and int(forecast.currentConditions.temperature) <= 59):
+                suggestion += "cool"
+            elif (int(forecast.currentConditions.temperature) > 59 and int(forecast.currentConditions.temperature) <= 95):
+                if (int(forecast.currentConditions.percentHumidity) >= 75):
+                    suggestion += "soggy"
+                elif (int(forecast.currentConditions.percentHumidity) >= 50 and int(forecast.currentConditions.percentHumidity) < 75):
+                    suggestion += "humid"
+                elif (int(forecast.currentConditions.percentHumidity) >= 25 and int(forecast.currentConditions.percentHumidity) < 50):
+                    suggestion += "moist"
+                else:
+                    suggestion += "warm"
+            else:
+                suggestion += "scorching"
+        else:
+            if (int(forecast.currentConditions.temperature) <= 1):
+                suggestion += "freezing"
+            elif (int(forecast.currentConditions.temperature) > 1 and int(forecast.currentConditions.temperature) <= 15):
+                suggestion += "cool"
+            elif (int(forecast.currentConditions.temperature) > 15 and int(forecast.currentConditions.temperature) <= 35):
+                if (int(forecast.currentConditions.percentHumidity) >= 75):
+                    suggestion += "soggy"
+                elif (int(forecast.currentConditions.percentHumidity) >= 50 and int(forecast.currentConditions.percentHumidity) < 75):
+                    suggestion += "humid"
+                elif (int(forecast.currentConditions.percentHumidity) >= 25 and int(forecast.currentConditions.percentHumidity) < 50):
+                    suggestion += "moist"
+                else:
+                    suggestion += "warm"
+            else:
+                suggestion += "scorching"
+        
+        self.say(random.choice(localizations["currentTime"][language]) + ".  The temperature in {0}, {1} is a {2} {3} degrees {4}.".format(forecast.weatherLocation.city, countryName, suggestion, forecast.currentConditions.temperature, forecast.units.temperatureUnits))
+
+        clock = ClockObject()
+        clock.timezoneId = self.connection.assistant.timeZoneId
+        
+        clockView = ClockSnippet()
+        clockView.clocks = [clock]
+        
+        rootAnchor = UIAddViews(self.refId)
+        rootAnchor.dialogPhase = rootAnchor.DialogPhaseSummaryValue
+        rootAnchor.views = [clockView]
+
+        self.sendRequestWithoutAnswer(rootAnchor)
+
+        snippet = WeatherForecastSnippet()
+        snippet.aceWeathers = [forecast]
+        
+        showViewsCMD = UIAddViews(self.refId)
+        showViewsCMD.dialogPhase = showViewsCMD.DialogPhaseSummaryValue
+        
+        showViewsCMD.views = [snippet]
+        
+        self.sendRequestWithoutAnswer(showViewsCMD)
+
+        self.complete_request()
+        
+    @register("en-US", "good (day|morning|afternoon|evening|night)")
+    def timedweather(self, speech, language):
+        recite = speech[0].capitalize() + speech[1:].lower()
+        #first tell that we look it up
+        self.say("{0}, {1}!".format(recite, self.user_name()))
+        location = self.getCurrentLocation()
+        
+        lng = location.longitude
+        lat = location.latitude
+        
+        # we need the corresponding WOEID to the location
+        query = "select woeid from geo.places where text=\"{0},{1}\"".format(lat,lng)
+        reverseLookup = "http://query.yahooapis.com/v1/public/yql?q={0}&format=xml".format(urllib.quote(query.encode("utf-8")))
+        #reverseLookup = "http://where.yahooapis.com/geocode?location={0},{1}&gflags=R&appid={2}".format(lat, lng, yahooAPIkey)
+        result = getWebsite(reverseLookup, timeout=5)
+        if result == None:
+            self.say(random.choice(errorText[language]))
+            self.complete_request()
+            return
+        
+        root = ElementTree.XML(result)
+        woeidElem = root.find("results/{0}place/{0}woeid".format(place))
+        
+        if woeidElem is None:
+            self.say(random.choice(noDataForLocationText[language]))
+            self.complete_request()
+            return
+        
+        self.showCurrentWeatherWithTime(language, woeidElem.text)
+        
+        self.complete_request()
