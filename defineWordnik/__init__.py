@@ -8,8 +8,12 @@
 #
 # Wordnik Plugin
 #
-#additional Wordnik functions to add can be found at:
-#http://developer.wordnik.com/docs/
+# by Twisted, based on work by mrjf
+#
+# Wordnik functions can be found at
+# http://developer.wordnik.com/docs/
+# Original python API can be referenced at
+# https://github.com/wordnik/wordnik-python
 #
 # Urban Dictionary Plugin
 #
@@ -17,7 +21,15 @@
 #
 # Wikipedia Plugin
 #
-# Unit Converter Plugin
+# Calculator Plugin
+#
+# by Mike Pissanos (gaVRos) 
+#    Usage: simply say Convert or Calculate X to Y
+#    Examples: 
+#             Convert 70 ferinheight to celsius 
+#             Convert 1 euro to dollars
+#             Convert 1 tablespoon to teaspoons
+#             Calculate 30 divided by 10
 #
 # Display Plugin
 #
@@ -44,35 +56,48 @@ from siriObjects.websearchObjects import WebSearch
 #you will need to install the Wordnik API to use this
 #this can be done from the commandline by typing: easy_install Wordnik
 try:
-   from wordnik import Wordnik
+   from wordnik.api.WordAPI import WordAPI
+   import wordnik.model
+   # from wordnik import Wordnik
 except ImportError:
    raise NecessaryModuleNotFound("Wordnik library not found. Please install wordnik library! e.g. sudo easy_install wordnik")
 
-#You need a wordnik api key, you can get yours at http://developer.wordnik.com/ (first you sign up for a username in the upp$
+#You need a wordnik api key, you can get yours at http://developer.wordnik.com/ (first you sign up for a username with Wordnik, then submit it for an API key)
 ########################################################
 
 wordnik_api_key = APIKeyForAPI("wordnik")
 
 #########################################################
 
-w = Wordnik(api_key=wordnik_api_key)
+import sys
+sys.path.append('../../wordnik/wordnik')
+
+from wordnik.api.APIClient import APIClient
+import wordnik.model
+
+my_client = APIClient(wordnik_api_key, 'http://api.wordnik.com/v4')
+
+from wordnik.api.WordAPI import WordAPI
+wordAPI = WordAPI(my_client)
 
 class defineWordnik(Plugin):
     
     @register("en-US", ".*define ([\w ]+)")
     def defineword(self, speech, language, regMatched):
-        Question = regMatched.group(1).lower()
-        output = w.word_get_definitions(Question, limit=1)
+        question = regMatched.group(1).lower()
+        input = wordnik.model.WordDefinitionsInput.WordDefinitionsInput()
+        input.word = question
+        input.limit = 1
+        output = wordAPI.getDefinitions(input)
         if len(output) == 1:
-            answer = dict(output[0])
-            if u'text' in answer:
-                worddef = answer[u'text']
+            for answer in output:
+                worddef = answer.text
                 if worddef:
-                    self.say(worddef, "The definition of {0} is: {1}".format(Question, worddef))
+                    self.say(worddef, "The definition of {0} is: {1}".format(question, worddef))
                 else:
-                    self.say("Sorry, I could not find " + Question + " in the dictionary.")
+                    self.say("Sorry, I could not find " + question + " in the dictionary.")
         else:
-            self.say("Sorry, I could not find " + Question + " in the dictionary.")
+            self.say("Sorry, I could not find " + question + " in the dictionary.")
 
         self.complete_request()
 
@@ -107,6 +132,7 @@ class images(Plugin):
             if speech == "":
                 speech = self.ask("What is your query?")
 
+        self.say("Searching Google for " + speech)
         search = WebSearch(refId=self.refId, query=speech)
         self.sendRequestWithoutAnswer(search)
         self.complete_request()
@@ -131,10 +157,11 @@ class urbandictionary(Plugin):
                 word = data['list'][i][u'word']
             definition = data['list'][i][u'definition']
             example = data['list'][i][u'example']
-            print(word + ': ' + definition),
-            print('example: ' + example),
-        self.say(word + ': ' + definition)
-        self.say('For example: ' + example)
+        if definition.startswith(word + ':'):
+            self.say(definition).replace(word + ':', word + ': ')
+        else:
+            self.say(word + ': ' + definition)
+        self.say('Example: ' + example)
         self.complete_request()
 
 class wikipedia(Plugin):
@@ -287,10 +314,11 @@ class UnitsConverter(Plugin):
         try:
             result = urllib2.urlopen(SearchURL).read().decode("utf-8", "ignore")
             result = re.sub("([a-z]+):", '"\\1" :', result)
-            result = json.loads(result)
-            ConvA = result['lhs']
-            ConvB = result['rhs'] 
-            self.say("Here is what I found..." '\n' +str(ConvA) + " equals, " +str(ConvB))
+            response = json.loads(result)
+            ConvA = response['lhs']
+            ConvB = response['rhs'] 
+            self.say("I was able to calculate the following results:")
+            self.say(str(ConvA) + " equals " + str(Conv))
             self.complete_request()
         except (urllib2.URLError):
             self.say("Sorry, but a connection to the Google calculator could not be established.")
