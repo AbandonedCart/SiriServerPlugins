@@ -21,7 +21,7 @@
 # === Usage ===  
 # -- Get information about a movie --
 # (movie lookup)* ([\w ]+)
-# Example: say "Movie lookup The Matrix"
+# Example: say "Look up movie The Matrix"
 
 # -- Get director for a movie --
 # (who directed)* ([\w ]+)
@@ -43,8 +43,12 @@ import re
 import sys
 import urllib2, urllib
 import json
+
 from plugin import *
 
+from plugins.nurfimdb.googlemovieshowtimes import *
+ 
+from siriObjects.systemObjects import GetRequestOrigin, Location
 from siriObjects.uiObjects import AddViews
 from siriObjects.answerObjects import AnswerSnippet, AnswerObject, AnswerObjectLine
 
@@ -232,4 +236,51 @@ class nurf_imdb(Plugin):
                     self.complete_request()
                 except:
                     self.say("Sorry. This movie has not yet been rated.")
+                    self.complete_request()
+
+    @register("en-US", ".*(movie times|showtimes)* ([\w ]+)") 
+    def get_rating(self, speech, language,  regex):
+        if language == "en-US":
+            movieTitle = regex.group(regex.lastindex)
+            location = self.getCurrentLocation(force_reload=True,accuracy=GetRequestOrigin.desiredAccuracyBest)
+            url = "http://maps.googleapis.com/maps/api/geocode/json?latlng={0},{1}&sensor=false&language={2}".format(str(location.latitude),str(location.longitude), language)
+            try:
+                jsonString = urllib2.urlopen(url, timeout=3).read()
+            except:
+                pass
+            street=""
+            stateLong=""
+            postalCode=""
+            city=""
+            countryCode=""
+            the_header=""
+            if jsonString != None:
+                response = json.loads(jsonString)
+                if response['status'] == 'OK':
+                    components = response['results'][0]['address_components']              
+                    street += filter(lambda x: True if "route" in x['types'] else False, components)[0]['long_name']
+                    stateLong += filter(lambda x: True if "administrative_area_level_1" in x['types'] or "country" in x['types'] else False, components)[0]['long_name']
+                    try:
+                        postalCode += filter(lambda x: True if "postal_code" in x['types'] else False, components)[0]['long_name']
+                    except:
+                        postalCode+=""
+                    try:
+                        city += filter(lambda x: True if "locality" in x['types'] or "administrative_area_level_1" in x['types'] else False, components)[0]['long_name']
+                    except:
+                        city+=""
+                    originName = city + ", " + stateLong
+                    movieID = ""
+                    theaterID = ""
+                    movieObj = GoogleMovieShowtimes(originName, movieID, theaterID)
+                    self.say("Plugin still in development. Please click below for the Google movies listing.")
+                    url = "http://www.google.com/movies?hl=en&near={0}&dq=movie+times+{1}&sa=X&oi=showtimes&ct=title&cd=1&q={2}".format(postalCode, postalCode, movieTitle.encode("utf-8"))
+                    view = UIAddViews(self.refId)
+                    button = UIButton()
+                    if language == 'en-US':
+                        button.text = u"Showtimes for {0}".format(originName)
+                    link = UIOpenLink("")
+                    link.ref = url.replace("//","")
+                    button.commands = [link]
+                    view.views = [button]
+                    self.send_object(view)
                     self.complete_request()
